@@ -1,0 +1,70 @@
+{
+"update_url": "https://clients2.google.com/service/update2/crx",
+
+  "manifest_version": 3,
+  "name": "Sparx Neon",
+  "version": "1.6",
+  "description": "Fast neon AI helper for Sparx Maths, Reader, and Science",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://*.sparxmaths.uk/*",
+    "https://*.sparxmaths.com/*",
+    "https://*.sparxreader.com/*",
+    "https://sparxreader.com/*",
+    "https://*.sparxscience.com/*",
+    "https://sparxscience.com/*",
+    "https://*.sparx-learning.com/*",
+    "https://sparx-learning.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.anthropic.com/*",
+    "https://api.groq.com/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src https://generativelanguage.googleapis.com https://api.anthropic.com https://api.groq.com"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.sparxmaths.uk/*",
+        "https://*.sparxmaths.com/*",
+        "https://*.sparxreader.com/*",
+        "https://sparxreader.com/*",
+        "https://*.sparxscience.com/*",
+        "https://sparxscience.com/*",
+        "https://*.sparx-learning.com/*",
+        "https://sparx-learning.com/*"
+      ],
+      "js": ["patch.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://*.sparxmaths.uk/*",
+        "https://*.sparxmaths.com/*",
+        "https://*.sparxreader.com/*",
+        "https://sparxreader.com/*",
+        "https://*.sparxscience.com/*",
+        "https://sparxscience.com/*",
+        "https://*.sparx-learning.com/*",
+        "https://sparx-learning.com/*"
+      ],
+      "js": ["html2canvas.min.js", "marked.min.js", "katex.min.js", "katex-autorender.min.js", "content.js"],
+      "css": ["panel.css", "katex.min.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

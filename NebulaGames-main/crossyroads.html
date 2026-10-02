@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BLOCKY CROSSING: INFINITE</title>
+    <style>
+        body { margin: 0; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; color: white; font-family: 'Courier New', Courier, monospace; overflow: hidden; }
+        canvas { background: #4daa3d; border: 4px solid #fff; }
+        #ui { position: absolute; top: 20px; text-align: center; width: 100%; pointer-events: none; z-index: 5; }
+        #score { font-size: 50px; font-weight: 900; text-shadow: 3px 3px #000; }
+        #msg { position: absolute; background: rgba(0,0,0,0.9); padding: 30px; border: 3px solid #fff; display: none; text-align: center; z-index: 10; }
+        button { background: #fff; border: none; padding: 10px 20px; font-family: inherit; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <div id="score">0</div>
+    <div style="font-size: 12px; opacity: 0.7;">DISTANCE RECORD: <span id="best">0</span></div>
+</div>
+
+<div id="msg" id="deathScreen">
+    <h1 style="color: #ff4444; margin: 0;">SPLAT!</h1>
+    <p>YOU DRIFTED TOO FAR</p>
+    <button onclick="init()">RE-DEPLOY</button>
+</div>
+
+<canvas id="game"></canvas>
+
+<script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const bestEl = document.getElementById('best');
+    const msg = document.getElementById('msg');
+
+    const GRID = 40;
+    const COLS = 10;
+    canvas.width = COLS * GRID;
+    canvas.height = 600;
+
+    let score = 0, highVal = 0, alive = true, cameraY = 0;
+    let rows = [], player = { x: 5, y: 10, offset: 0 };
+
+    function init() {
+        score = 0; alive = true; cameraY = 0;
+        player.x = 4; player.y = 10; player.offset = 0;
+        rows = [];
+        msg.style.display = 'none';
+        for(let i=0; i<25; i++) addRow(i, i > 8);
+        requestAnimationFrame(draw);
+    }
+
+    function addRow(y, isSafe) {
+        let type = 'grass';
+        if(!isSafe) {
+            const r = Math.random();
+            if(r > 0.7) type = 'road';
+            else if(r > 0.4) type = 'water';
+            else if(r > 0.25) type = 'rail';
+        }
+        
+        const row = {
+            y: y,
+            type: type,
+            entities: [],
+            speed: (Math.random() * 1.5 + 1) * (Math.random() > 0.5 ? 1 : -1)
+        };
+
+        if(type !== 'grass') {
+            const count = type === 'rail' ? 1 : 3;
+            for(let i=0; i<count; i++) {
+                row.entities.push({ x: i * (canvas.width/count), w: type === 'water' ? 100 : 60 });
+            }
+        }
+        rows.push(row);
+    }
+
+    window.addEventListener('keydown', e => {
+        if(!alive) return;
+        if(e.code === 'ArrowUp' || e.code === 'KeyW') { player.y--; score = Math.max(score, 10 - player.y); }
+        if(e.code === 'ArrowDown' || e.code === 'KeyS') player.y++;
+        if(e.code === 'ArrowLeft' || e.code === 'KeyA') player.x--;
+        if(e.code === 'ArrowRight' || e.code === 'KeyD') player.x++;
+        player.offset = 0; // Reset offset on manual move
+    });
+
+    function update() {
+        if(!alive) return;
+
+        cameraY += ((player.y - 8) * GRID - cameraY) * 0.1;
+
+        if(rows[0].y * GRID < cameraY - GRID) {
+            const nextY = rows[rows.length-1].y + 1;
+            rows.shift();
+            addRow(nextY, false);
+        }
+
+        let onLog = false;
+        rows.forEach(row => {
+            if(row.type === 'grass') return;
+
+            const isRail = row.type === 'rail';
+            const s = isRail ? row.speed * 6 : row.speed;
+
+            row.entities.forEach(en => {
+                en.x += s;
+                if(en.x > canvas.width) en.x = -en.w;
+                if(en.x < -en.w) en.x = canvas.width;
+
+                // Collision Logic
+                if(player.y === row.y) {
+                    const px = player.x * GRID + player.offset;
+                    if(px + 5 < en.x + en.w && px + GRID - 5 > en.x) {
+                        if(row.type === 'water') {
+                            onLog = true;
+                            player.offset += s; // Drag player with log
+                        } else {
+                            die();
+                        }
+                    }
+                }
+            });
+
+            if(player.y === row.y && row.type === 'water' && !onLog) die();
+        });
+
+        // Bounds Check
+        const finalX = player.x * GRID + player.offset;
+        if(finalX < -10 || finalX > canvas.width - 20) die();
+        
+        scoreEl.innerText = score;
+    }
+
+    function die() {
+        if(!alive) return;
+        alive = false;
+        msg.style.display = 'block';
+        highVal = Math.max(highVal, score);
+        bestEl.innerText = highVal;
+    }
+
+    function draw() {
+        if(!alive) return;
+        ctx.clearRect(0,0,canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(0, -cameraY);
+
+        rows.forEach(row => {
+            const py = row.y * GRID;
+            ctx.fillStyle = row.type === 'grass' ? '#4daa3d' : (row.type === 'road' ? '#333' : (row.type === 'water' ? '#0077be' : '#222'));
+            ctx.fillRect(0, py, canvas.width, GRID);
+            
+            if(row.type === 'rail') {
+                ctx.fillStyle = '#444'; ctx.fillRect(0, py+18, canvas.width, 4);
+            }
+
+            row.entities.forEach(en => {
+                ctx.fillStyle = row.type === 'water' ? '#8b5a2b' : (row.type === 'rail' ? '#eee' : '#ffcc00');
+                ctx.fillRect(en.x, py + 4, en.w, GRID - 8);
+            });
+        });
+
+        // Player
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(player.x * GRID + player.offset + 5, player.y * GRID + 5, GRID-10, GRID-10);
+        
+        ctx.restore();
+        update();
+        requestAnimationFrame(draw);
+    }
+
+    init();
+</script>
+</body>
+</html>

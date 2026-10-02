@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PHYSICS REVISION PRO | Optics & Waves</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;700&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #ff0055; 
+            --bg: #0a0a0c;
+            --card: #16161e;
+            --text: #ffffff;
+            --correct: #00ff88;
+            --wrong: #ff3b3b;
+            --optics: #00d9ff;
+            --formula: #706fd3;
+            --space: #a29bfe;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            -webkit-user-select: none;
+        }
+
+        header {
+            background: linear-gradient(135deg, #44001a 0%, #0a0a0c 100%);
+            padding: 40px 20px;
+            text-align: center;
+            border-bottom: 3px solid var(--primary);
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(10, 10, 12, 0.8);
+            padding: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(15px);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .container {
+            padding: 20px;
+            max-width: 900px;
+            margin: auto;
+        }
+
+        .game-card {
+            background: var(--card);
+            border-radius: 24px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.05);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+        }
+
+        .question-display {
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 25px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 18px;
+            padding: 20px;
+            border: 1px solid var(--optics);
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        @media (max-width: 600px) { .options-grid { grid-template-columns: 1fr; } }
+
+        .btn-tap {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid rgba(255,255,255,0.1);
+            color: white;
+            padding: 18px;
+            border-radius: 16px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-tap:active {
+            background: var(--optics);
+            color: #000;
+            transform: scale(0.96);
+        }
+
+        .formula-box {
+            font-family: 'Fira Code', monospace;
+            background: #000;
+            padding: 10px 20px;
+            color: var(--optics);
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 1.4rem;
+            border: 1px solid #333;
+        }
+
+        .revision-sheet {
+            background: #fff;
+            color: #111;
+            border-radius: 30px;
+            padding: 35px;
+            margin-top: 40px;
+        }
+
+        .revision-sheet h2 { color: var(--primary); }
+
+        .tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            background: var(--optics);
+            color: #000;
+            text-transform: uppercase;
+        }
+
+        .feedback-pop {
+            position: fixed;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            font-weight: 900;
+            z-index: 1000;
+            pointer-events: none;
+            display: none;
+            text-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1 style="margin:0; font-size: 2.2rem; letter-spacing: -1px;">WAVE-OPTIC TERMINAL</h1>
+    <p style="opacity: 0.7; font-weight: 500;">Dispersion • Refraction • Solar System • Waves</p>
+</header>
+
+<div class="stats-bar">
+    <div>RANK: <span id="rank" style="color:var(--optics); font-weight:900;">NOVICE</span></div>
+    <div>STREAK: <span id="streak" style="color:var(--correct); font-weight:900;">0</span></div>
+</div>
+
+<div class="container">
+    
+    <div class="game-card">
+        <span class="tag">Physics Mastery</span>
+        <div class="question-display">
+            <div id="q-category">Identify the Concept:</div>
+            <div id="target-symbol" class="formula-box">Loading...</div>
+        </div>
+        <div id="options" class="options-grid"></div>
+    </div>
+
+    <div class="game-card" style="border-color: var(--primary);">
+        <span class="tag" style="background:var(--primary); color: white;">EXAM TRAP: PRO EDITION</span>
+        <div id="trap-q" class="question-display" style="font-size: 1.1rem; border-color: var(--primary);">
+            "Initialising trap..."
+        </div>
+        <div class="options-grid">
+            <button class="btn-tap" onclick="checkTrap(true)">TRUE</button>
+            <button class="btn-tap" onclick="checkTrap(false)">FALSE</button>
+        </div>
+    </div>
+
+    <div id="feedback" class="feedback-pop"></div>
+
+    <div class="revision-sheet">
+        <h2>🌈 Master Summary Sheet</h2>
+        
+        <h3>1. Color & Filters</h3>
+        <p>A <b>Color Filter</b> only transmits its own color and absorbs all others. In blue light, a red object appears <b>Black</b> because there is no red light to reflect.</p>
+
+        <h3>2. Refraction & Reflection</h3>
+        <p><b>Refraction:</b> Light changes speed/direction in different densities. <b>Violet</b> bends most; <b>Red</b> bends least.</p>
+        <p><b>Reflection:</b> The angle of incidence always equals the angle of reflection ($i = r$).</p>
+
+        <h3>3. Wave Anatomy</h3>
+        <ul>
+            <li><b>Amplitude:</b> Height (Loudness/Energy).</li>
+            <li><b>Frequency:</b> Number of waves per second (Pitch).</li>
+            <li><b>Transverse:</b> Vibrations at 90° to travel (Light).</li>
+            <li><b>Longitudinal:</b> Vibrations parallel to travel (Sound).</li>
+        </ul>
+
+        <h3>4. The Solar System</h3>
+        <ul>
+            <li><b>Day/Night:</b> Caused by Earth's 24-hour <b>Rotation</b> on its axis.</li>
+            <li><b>Years:</b> Caused by Earth's 365.25-day <b>Orbit</b> around the Sun.</li>
+            <li><b>Seasons:</b> Caused by the <b>23.5° Tilt</b> of Earth's axis.</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+    const PHYSICS_DATA = [
+        // Dispersion/Refraction
+        { c: "Dispersion", q: "White light splitting into a spectrum", a: "Prism", o: ["Prism", "Mirror", "Filter", "Lens"] },
+        { c: "Dispersion", q: "Which color refracts (bends) the most?", a: "Violet", o: ["Violet", "Red", "Green", "Yellow"] },
+        { c: "Refraction", q: "Light entering glass from air will...", a: "Slow down", o: ["Slow down", "Speed up", "Stay same", "Stop"] },
+        { c: "Refraction", q: "Bending TOWARDS the normal means it is...", a: "Entering denser medium", o: ["Entering denser medium", "Entering less dense medium", "Reflecting", "Diffracting"] },
+        
+        // Filters/Color
+        { c: "Filters", q: "What light does a Blue filter transmit?", a: "Blue only", o: ["Blue only", "All colors", "Green and Red", "No light"] },
+        { c: "Filters", q: "How does a red ball look in blue light?", a: "Black", o: ["Black", "Red", "Blue", "Purple"] },
+        { c: "Color", q: "Primary colors of light", a: "Red, Green, Blue", o: ["Red, Green, Blue", "Red, Yellow, Blue", "Cyan, Magenta, Yellow", "Black & White"] },
+        
+        // Waves
+        { c: "Waves", q: "Measure of a wave's loudness/energy", a: "Amplitude", o: ["Amplitude", "Frequency", "Wavelength", "Period"] },
+        { c: "Waves", q: "Distance from one peak to the next", a: "Wavelength", o: ["Wavelength", "Amplitude", "Velocity", "Trough"] },
+        { c: "Waves", q: "Frequency is measured in...", a: "Hertz", o: ["Hertz", "Meters", "Joules", "Newtons"] },
+        { c: "Waves", q: "Sound is what type of wave?", a: "Longitudinal", o: ["Longitudinal", "Transverse", "Electromagnetic", "Vacuum"] },
+        
+        // Reflection
+        { c: "Reflection", q: "Law of Reflection states $i$ equals...", a: "r", o: ["r", "90°", "Normal", "Refraction"] },
+        { c: "Reflection", q: "Reflection from a mirror is called...", a: "Specular", o: ["Specular", "Diffuse", "Total", "Internal"] },
+
+        // Solar System
+        { c: "Solar System", q: "What causes Day and Night?", a: "Earth's Rotation", o: ["Earth's Rotation", "Earth's Orbit", "Sun's Rotation", "Moon's Orbit"] },
+        { c: "Solar System", q: "Time taken for one Earth Orbit", a: "365.25 Days", o: ["365.25 Days", "24 Hours", "28 Days", "12 Hours"] },
+        { c: "Solar System", q: "What causes Earth's Seasons?", a: "Tilt of the Axis", o: ["Tilt of the Axis", "Distance from Sun", "Ocean Tides", "Wind"] },
+        { c: "Solar System", q: "Sun appears to rise in the...", a: "East", o: ["East", "West", "North", "South"] },
+        { c: "Solar System", q: "Largest planet in our system", a: "Jupiter", o: ["Jupiter", "Saturn", "Neptune", "Earth"] }
+    ];
+
+    const TRAP_DATA = [
+        { s: "White light is made of only one color.", v: false, e: "White light is a spectrum of all colors." },
+        { s: "Increasing amplitude makes a sound higher pitch.", v: false, e: "Amplitude = Loudness. Frequency = Pitch." },
+        { s: "Refraction happens because light changes speed.", v: true, e: "Correct! Speed change causes direction change." },
+        { s: "A green filter transmits red light.", v: false, e: "Filters only let their own color through." },
+        { s: "Earth is closer to the sun in summer.", v: false, e: "Seasons are caused by TILT, not distance." },
+        { s: "The Moon is a luminous source.", v: false, e: "The Moon reflects light; it doesn't create it." },
+        { s: "Sound cannot travel through space.", v: true, e: "Correct! Space is a vacuum; sound needs particles." },
+        { s: "Earth rotates East to West.", v: false, e: "Earth rotates West to East, making the Sun 'rise' in the East." }
+    ];
+
+    let score = 0;
+    let streak = 0;
+
+    function showFeedback(text, color) {
+        const f = document.getElementById('feedback');
+        f.innerText = text;
+        f.style.color = color;
+        f.style.display = 'block';
+        f.style.opacity = '1';
+        setTimeout(() => { f.style.display = 'none'; }, 700);
+    }
+
+    function loadQuestion() {
+        const q = PHYSICS_DATA[Math.floor(Math.random() * PHYSICS_DATA.length)];
+        document.getElementById('q-category').innerText = q.q;
+        document.getElementById('target-symbol').innerText = q.c;
+        
+        const optDiv = document.getElementById('options');
+        optDiv.innerHTML = '';
+        
+        let shuffled = [...q.o].sort(() => Math.random() - 0.5);
+        
+        shuffled.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'btn-tap';
+            btn.innerText = opt;
+            btn.onclick = () => {
+                if(opt === q.a) {
+                    score += 50;
+                    streak++;
+                    showFeedback("⚡", "var(--correct)");
+                } else {
+                    streak = 0;
+                    showFeedback("❌", "var(--wrong)");
+                }
+                updateUI();
+                loadQuestion();
+            };
+            optDiv.appendChild(btn);
+        });
+    }
+
+    let activeTrap = {};
+    function loadTrap() {
+        activeTrap = TRAP_DATA[Math.floor(Math.random() * TRAP_DATA.length)];
+        document.getElementById('trap-q').innerText = `"${activeTrap.s}"`;
+    }
+
+    function checkTrap(val) {
+        if(val === activeTrap.v) {
+            score += 150;
+            streak++;
+            showFeedback("GOD-LIKE!", "var(--correct)");
+        } else {
+            streak = 0;
+            showFeedback("TRAPPED!", "var(--wrong)");
+            alert("EXAM TRAP: " + activeTrap.e);
+        }
+        updateUI();
+        loadTrap();
+    }
+
+    function updateUI() {
+        document.getElementById('streak').innerText = streak;
+        let rank = "NOVICE";
+        if(score > 500) rank = "OPTICIAN";
+        if(score > 1500) rank = "WAVE MASTER";
+        if(score > 3000) rank = "SOLAR VOYAGER";
+        if(score > 6000) rank = "GALACTIC OVERLORD";
+        document.getElementById('rank').innerText = rank;
+    }
+
+    window.onload = () => {
+        loadQuestion();
+        loadTrap();
+    };
+</script>
+
+</body>
+</html>

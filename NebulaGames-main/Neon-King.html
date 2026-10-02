@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FLAIL KINGS</title>
+    <style>
+        body {
+            margin: 0; background: #0a0a0f; color: #fff;
+            font-family: 'Orbitron', sans-serif; overflow: hidden;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh;
+        }
+        #menu {
+            position: absolute; z-index: 10; text-align: center;
+            background: rgba(0,0,0,0.9); padding: 30px; border: 2px solid #333;
+            border-radius: 10px; box-shadow: 0 0 30px #000;
+        }
+        button {
+            display: block; width: 260px; margin: 10px auto; padding: 15px;
+            background: #1a1a2e; color: #4deeea; border: 1px solid #4deeea;
+            cursor: pointer; font-weight: bold; text-transform: uppercase; transition: 0.2s;
+        }
+        button:hover { background: #4deeea; color: #000; box-shadow: 0 0 20px #4deeea; }
+        canvas { background: #050508; border: 2px solid #222; display: none; touch-action: none; }
+        #stats { position: absolute; top: 20px; font-size: 1.5rem; display: none; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <div id="stats">HP: 100 | HP: 100</div>
+
+    <div id="menu">
+        <h1 style="color: #4deeea; letter-spacing: 5px;">FLAIL KINGS</h1>
+        <button onclick="init('PvB')">Player vs Bot</button>
+        <button onclick="init('PvP')">Player vs Player</button>
+        <button onclick="init('2PvB')">2P vs Colossus (Boss)</button>
+        <button onclick="init('BvB')">Watch: Bot vs Bot</button>
+        <p style="font-size: 0.7rem; opacity: 0.6;">PC: Mouse / WASD | Mobile: Touch & Drag</p>
+    </div>
+
+    <canvas id="arena"></canvas>
+
+<script>
+    const canvas = document.getElementById('arena');
+    const ctx = canvas.getContext('2d');
+    const menu = document.getElementById('menu');
+    const stats = document.getElementById('stats');
+
+    let mode = '';
+    let players = [];
+    let shake = 0;
+    const keys = {};
+
+    window.onkeydown = e => keys[e.code] = true;
+    window.onkeyup = e => keys[e.code] = false;
+
+    function init(m) {
+        mode = m;
+        menu.style.display = 'none';
+        canvas.style.display = 'block';
+        stats.style.display = 'block';
+        resize();
+        setup();
+        loop();
+    }
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+
+    class Brawler {
+        constructor(x, y, color, control, id) {
+            this.x = x; this.y = y; this.r = 20;
+            this.vx = 0; this.vy = 0;
+            this.color = color; this.control = control; this.id = id;
+            this.hp = 100;
+            
+            // Flail Physics
+            this.fx = x; this.fy = y + 60;
+            this.fvx = 0; this.fvy = 0;
+            this.flen = 70; // Chain length
+            this.fr = 15;   // Flail size
+        }
+
+        update() {
+            if (this.hp <= 0) return;
+
+            // Movement Logic
+            const speed = 0.8;
+            if (this.control === 'mouse') {
+                let dx = mouse.x - this.x;
+                let dy = mouse.y - this.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist > 5) {
+                    this.vx += (dx / dist) * speed;
+                    this.vy += (dy / dist) * speed;
+                }
+            } else if (this.control === 'keys') {
+                if (keys['KeyW'] || keys['ArrowUp']) this.vy -= speed;
+                if (keys['KeyS'] || keys['ArrowDown']) this.vy += speed;
+                if (keys['KeyA'] || keys['ArrowLeft']) this.vx -= speed;
+                if (keys['KeyD'] || keys['ArrowRight']) this.vx += speed;
+            } else if (this.control === 'bot') {
+                let target = players.find(p => p !== this && p.hp > 0);
+                if (target) {
+                    let dx = target.x - this.x;
+                    let dy = target.y - this.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    // AI tries to orbit the player to swing the flail
+                    this.vx += (dx / dist) * 0.5;
+                    this.vy += (dy / dist - Math.sin(Date.now()*0.005)*5) * 0.5;
+                }
+            }
+
+            this.vx *= 0.94; this.vy *= 0.94;
+            this.x += this.vx; this.y += this.vy;
+
+            // Constrain to Screen
+            this.x = Math.max(this.r, Math.min(canvas.width - this.r, this.x));
+            this.y = Math.max(this.r, Math.min(canvas.height - this.r, this.y));
+
+            // Flail Logic (Verlet-ish Physics)
+            this.fvx += (this.x - this.fx) * 0.1;
+            this.fvy += (this.y - this.fy) * 0.1;
+            this.fvx *= 0.92; this.fvy *= 0.92;
+            this.fx += this.fvx; this.fy += this.fvy;
+
+            // Keep flail at chain length
+            let dx = this.fx - this.x;
+            let dy = this.fy - this.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist > this.flen) {
+                this.fx = this.x + (dx / dist) * this.flen;
+                this.fy = this.y + (dy / dist) * this.flen;
+            }
+        }
+
+        draw() {
+            if (this.hp <= 0) return;
+            
+            // Draw Chain
+            ctx.strokeStyle = '#555'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(this.x, this.y); ctx.lineTo(this.fx, this.fy); ctx.stroke();
+
+            // Draw Core
+            ctx.shadowBlur = 15; ctx.shadowColor = this.color;
+            ctx.fillStyle = this.color;
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI*2); ctx.fill();
+
+            // Draw Flail
+            let speed = Math.sqrt(this.fvx**2 + this.fvy**2);
+            ctx.fillStyle = speed > 10 ? '#fff' : this.color;
+            ctx.beginPath(); ctx.arc(this.fx, this.fy, this.fr, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    const mouse = { x: 0, y: 0 };
+    canvas.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+    canvas.addEventListener('touchmove', e => { 
+        mouse.x = e.touches[0].clientX; mouse.y = e.touches[0].clientY; 
+        e.preventDefault(); 
+    }, {passive: false});
+
+    function setup() {
+        players = [];
+        const cx = canvas.width/2;
+        const cy = canvas.height/2;
+
+        if (mode === 'PvB') {
+            players.push(new Brawler(cx - 200, cy, '#4deeea', 'mouse', 'P1'));
+            players.push(new Brawler(cx + 200, cy, '#ff3e3e', 'bot', 'CPU'));
+        } else if (mode === 'PvP') {
+            players.push(new Brawler(cx - 200, cy, '#4deeea', 'mouse', 'P1'));
+            players.push(new Brawler(cx + 200, cy, '#74ee15', 'keys', 'P2'));
+        } else if (mode === '2PvB') {
+            players.push(new Brawler(cx - 200, cy - 100, '#4deeea', 'mouse', 'P1'));
+            players.push(new Brawler(cx - 200, cy + 100, '#74ee15', 'keys', 'P2'));
+            let boss = new Brawler(cx + 200, cy, '#f000ff', 'bot', 'COLOSSUS');
+            boss.hp = 300; boss.r = 40; boss.flen = 120; boss.fr = 30;
+            players.push(boss);
+        } else {
+            players.push(new Brawler(cx - 200, cy, '#4deeea', 'bot', 'CPU 1'));
+            players.push(new Brawler(cx + 200, cy, '#ff3e3e', 'bot', 'CPU 2'));
+        }
+    }
+
+    function loop() {
+        ctx.setTransform(1,0,0,1, (Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+        shake *= 0.9;
+
+        ctx.fillStyle = 'rgba(10, 10, 15, 0.3)';
+        ctx.fillRect(0,0,canvas.width, canvas.height);
+
+        // Check Collisions
+        for(let p of players) {
+            if (p.hp <= 0) continue;
+            for(let target of players) {
+                if (p === target || target.hp <= 0) continue;
+
+                // Hit detection: p's flail hits target's core
+                let dx = p.fx - target.x;
+                let dy = p.fy - target.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < p.fr + target.r) {
+                    let force = Math.sqrt(p.fvx**2 + p.fvy**2);
+                    if (force > 3) {
+                        target.hp -= force * 0.5;
+                        target.vx += p.fvx * 0.8;
+                        target.vy += p.fvy * 0.8;
+                        shake = force;
+                        p.fvx *= -0.5; p.fvy *= -0.5; // Bounce flail
+                    }
+                }
+            }
+        }
+
+        players.forEach(p => { p.update(); p.draw(); });
+
+        // Update Stats
+        stats.innerText = players.map(p => `${p.id}: ${Math.ceil(p.hp)}%`).join(" | ");
+
+        // Win Condition
+        let alive = players.filter(p => p.hp > 0);
+        if (alive.length === 1 && players.length > 1) {
+            alert(alive[0].id + " IS VICTORIOUS!");
+            location.reload();
+            return;
+        }
+
+        requestAnimationFrame(loop);
+    }
+</script>
+</body>
+</html>

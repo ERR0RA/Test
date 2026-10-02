@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEXUS ARMS | FULLY FIXED</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Orbitron', sans-serif; user-select: none; }
+        #lobby { position: absolute; inset: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; color: white; }
+        .setup-grid { display: flex; gap: 15px; margin-bottom: 20px; }
+        .player-setup { background: #111; padding: 20px; border-radius: 10px; border: 1px solid #333; width: 250px; }
+        select, button { width: 100%; padding: 12px; margin: 5px 0; border-radius: 5px; font-family: 'Orbitron'; cursor: pointer; background: #222; color: white; border: 1px solid #444; }
+        #start-btn { background: #00f2ff; color: #000; font-weight: 900; border: none; font-size: 1.2rem; }
+        #ui { position: absolute; top: 20px; width: 100%; display: flex; justify-content: space-around; visibility: hidden; pointer-events: none; }
+        .bar-bg { width: 300px; height: 20px; background: #222; border: 2px solid #444; }
+        .hp { height: 100%; width: 100%; transition: width 0.1s; }
+        #hp1 { background: #00f2ff; box-shadow: 0 0 15px #00f2ff; }
+        #hp2 { background: #ff0055; box-shadow: 0 0 15px #ff0055; }
+        .score { font-size: 1.5rem; color: #fff; text-align: center; margin-bottom: 5px; }
+        #msg { position: absolute; top: 40%; width: 100%; text-align: center; font-size: 80px; font-weight: 900; color: #fff; display: none; text-shadow: 0 0 20px #f00; }
+    </style>
+</head>
+<body>
+
+<div id="lobby">
+    <h1>NEXUS ARMS</h1>
+    <div class="setup-grid">
+        <div class="player-setup">
+            <h3>P1: WASD + F</h3>
+            <select id="p1-wep"><option value="katana">KATANA</option><option value="heavy">HEAVY</option></select>
+        </div>
+        <div class="player-setup">
+            <h3>P2: ARROWS + ENTER</h3>
+            <select id="mode" onchange="document.getElementById('p2-s').style.display = (this.value=='pvp'?'block':'none')">
+                <option value="bot">AI BOT</option><option value="pvp">LOCAL PVP</option>
+            </select>
+            <div id="p2-s" style="display:none"><select id="p2-wep"><option value="katana">KATANA</option><option value="heavy">HEAVY</option></select></div>
+        </div>
+    </div>
+    <button id="start-btn">START COMBAT</button>
+</div>
+
+<div id="ui">
+    <div><div id="s1" class="score">0</div><div class="bar-bg"><div id="hp1" class="hp"></div></div></div>
+    <div><div id="s2" class="score">0</div><div class="bar-bg"><div id="hp2" class="hp"></div></div></div>
+</div>
+<div id="msg">K.O.</div>
+
+<script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }</script>
+<script type="module">
+    import * as THREE from 'three';
+
+    const WEP = {
+        katana: { dmg: 15, range: 5.5, speed: 0.18, cd: 400 },
+        heavy:  { dmg: 35, range: 6.5, speed: 0.08, cd: 1000 }
+    };
+
+    let wins = { p1: 0, p2: 0 }, roundActive = false, isBot = true, hitStop = false;
+    const ARENA_SIZE = 25, ACCEL = 0.02, FRIC = 0.88;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const light = new THREE.PointLight(0x00f2ff, 2, 100); light.position.set(0, 20, 0); scene.add(light);
+
+    const floor = new THREE.Mesh(new THREE.CylinderGeometry(ARENA_SIZE, ARENA_SIZE, 1, 64), new THREE.MeshStandardMaterial({color: 0x111111}));
+    floor.position.y = -0.5; scene.add(floor);
+    scene.add(new THREE.GridHelper(ARENA_SIZE*2, 20, 0x00f2ff, 0x222222));
+
+    class Fighter {
+        constructor(x, z, color) {
+            this.group = new THREE.Group();
+            this.vel = new THREE.Vector3();
+            this.color = color;
+            this.startPos = { x, z };
+            
+            this.mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.8, 1.5), new THREE.MeshStandardMaterial({color}));
+            this.mesh.position.y = 1.25;
+            this.group.add(this.mesh);
+
+            this.pivot = new THREE.Group();
+            this.pivot.position.set(0, 1.5, 0);
+            this.sword = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.5, 0.2), new THREE.MeshStandardMaterial({color: 0xffffff, emissive: color}));
+            this.sword.position.y = 1.75;
+            this.pivot.add(this.sword);
+            this.group.add(this.pivot);
+            
+            scene.add(this.group);
+        }
+        init(wKey) {
+            this.w = WEP[wKey];
+            this.hp = 100; this.atk = 0; this.last = 0; this.hit = false;
+            this.group.position.set(this.startPos.x, 0, this.startPos.z);
+            this.mesh.material.color.setHex(this.color);
+        }
+        update(opp) {
+            this.group.lookAt(opp.group.position.x, 0, opp.group.position.z);
+            if(this.atk > 0) {
+                this.atk -= this.w.speed;
+                this.pivot.rotation.x = Math.sin(this.atk * Math.PI) * -2.5;
+            }
+            this.group.position.add(this.vel);
+            this.vel.multiplyScalar(FRIC);
+            if(this.group.position.length() > ARENA_SIZE) this.group.position.normalize().multiplyScalar(ARENA_SIZE);
+        }
+        doAtk() {
+            if(Date.now() - this.last > this.w.cd && this.atk <= 0) {
+                this.atk = 1; this.hit = false; this.last = Date.now();
+            }
+        }
+    }
+
+    const p1 = new Fighter(-12, 0, 0x00f2ff);
+    const p2 = new Fighter(12, 0, 0xff0055);
+    const keys = {};
+    window.onkeydown = (e) => { 
+        keys[e.code] = true; 
+        if(e.code === 'KeyF') p1.doAtk(); 
+        if((e.code === 'Enter' || e.code === 'NumpadEnter') && !isBot) p2.doAtk();
+    };
+    window.onkeyup = (e) => keys[e.code] = false;
+
+    document.getElementById('start-btn').onclick = () => {
+        isBot = document.getElementById('mode').value === 'bot';
+        p1.init(document.getElementById('p1-wep').value);
+        p2.init(isBot ? 'katana' : document.getElementById('p2-wep').value);
+        document.getElementById('lobby').style.display = 'none';
+        document.getElementById('ui').style.visibility = 'visible';
+        roundActive = true; loop();
+    };
+
+    function processHits(a, b) {
+        if(a.atk > 0.2 && a.atk < 0.8 && !a.hit) {
+            if(a.group.position.distanceTo(b.group.position) < a.w.range) {
+                b.hp -= a.w.dmg; a.hit = true;
+                b.mesh.material.color.set(0xffffff);
+                setTimeout(() => b.mesh.material.color.set(b.color), 100);
+                hitStop = true; setTimeout(() => hitStop = false, 50);
+            }
+        }
+    }
+
+    function loop() {
+        if(!roundActive) return;
+        requestAnimationFrame(loop);
+        if(hitStop) return;
+
+        // P1
+        if(keys['KeyW']) p1.vel.z -= ACCEL; if(keys['KeyS']) p1.vel.z += ACCEL;
+        if(keys['KeyA']) p1.vel.x -= ACCEL; if(keys['KeyD']) p1.vel.x += ACCEL;
+
+        // P2
+        if(isBot) {
+            let d = p2.group.position.distanceTo(p1.group.position);
+            if(d > p2.w.range-1) {
+                let dir = new THREE.Vector3().subVectors(p1.group.position, p2.group.position).normalize();
+                p2.vel.add(dir.multiplyScalar(ACCEL*0.6));
+            } else if(Math.random() > 0.98) p2.doAtk();
+        } else {
+            if(keys['ArrowUp']) p2.vel.z -= ACCEL; if(keys['ArrowDown']) p2.vel.z += ACCEL;
+            if(keys['ArrowLeft']) p2.vel.x -= ACCEL; if(keys['ArrowRight']) p2.vel.x += ACCEL;
+        }
+
+        p1.update(p2); p2.update(p1);
+        processHits(p1, p2); processHits(p2, p1);
+
+        document.getElementById('hp1').style.width = Math.max(0, p1.hp) + '%';
+        document.getElementById('hp2').style.width = Math.max(0, p2.hp) + '%';
+
+        if(p1.hp <= 0 || p2.hp <= 0) {
+            roundActive = false;
+            let w = p1.hp <= 0 ? 'p2' : 'p1';
+            wins[w]++;
+            document.getElementById('s1').innerText = wins.p1;
+            document.getElementById('s2').innerText = wins.p2;
+            document.getElementById('msg').style.display = 'block';
+            setTimeout(() => {
+                p1.init(document.getElementById('p1-wep').value);
+                p2.init(isBot ? 'katana' : document.getElementById('p2-wep').value);
+                document.getElementById('msg').style.display = 'none';
+                roundActive = true; loop();
+            }, 1500);
+        }
+
+        let mid = new THREE.Vector3().addVectors(p1.group.position, p2.group.position).multiplyScalar(0.5);
+        camera.position.lerp(new THREE.Vector3(mid.x, 15, mid.z + 30), 0.1);
+        camera.lookAt(mid.x, 0, mid.z);
+        renderer.render(scene, camera);
+    }
+</script>
+</body>
+</html>

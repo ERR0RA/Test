@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shadow Shift: Light Harnessers</title>
+    <style>
+        body {
+            background-color: #050508;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        h1 {
+            margin: 5px 0;
+            color: #00f0ff;
+            text-shadow: 0 0 10px #00f0ff;
+        }
+
+        #controls-info {
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #8a8ab5;
+            text-align: center;
+        }
+
+        .highlight-p1 { color: #00f0ff; font-weight: bold; }
+        .highlight-p2 { color: #ff0055; font-weight: bold; }
+
+        #menu {
+            margin-bottom: 15px;
+        }
+
+        button {
+            background: transparent;
+            color: #ffffff;
+            border: 2px solid #00f0ff;
+            padding: 8px 16px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin: 0 5px;
+            transition: 0.2s;
+            box-shadow: 0 0 5px #00f0ff;
+        }
+
+        button:hover {
+            background: #00f0ff;
+            color: #050508;
+        }
+
+        canvas {
+            border: 3px solid #00f0ff;
+            box-shadow: 0 0 15px #00f0ff;
+            background-color: #0a0a12;
+        }
+
+        #scoreboard {
+            display: flex;
+            justify-content: space-between;
+            width: 600px;
+            margin-top: 10px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        #status {
+            margin-top: 10px;
+            font-size: 20px;
+            font-weight: bold;
+            height: 25px;
+            text-shadow: 0 0 8px #ffffff;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>SHADOW SHIFT</h1>
+    <div id="controls-info">
+        <span class="highlight-p1">P1: WASD + Space</span> | 
+        <span class="highlight-p2">P2: Arrows + Enter</span>
+    </div>
+
+    <div id="menu">
+        <button onclick="startGame('single')">1 Player (VS Bot)</button>
+        <button onclick="startGame('two')">2 Players (Local)</button>
+    </div>
+
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+    
+    <div id="scoreboard">
+        <span class="highlight-p1">P1 Energy: <span id="p1Score">0</span>%</span>
+        <span id="timer">Time: 40</span>
+        <span class="highlight-p2"><span id="p2Name">P2</span> Energy: <span id="p2Score">0</span>%</span>
+    </div>
+
+    <div id="status">Stand in the light to charge! Pulse to disrupt.</div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusDiv = document.getElementById('status');
+        const p1ScoreEl = document.getElementById('p1Score');
+        const p2ScoreEl = document.getElementById('p2Score');
+        const p2NameEl = document.getElementById('p2Name');
+        const timerEl = document.getElementById('timer');
+
+        const SPEED = 4;
+        let gameLoop = null;
+        let timerInterval = null;
+        let gameMode = 'single';
+        let timeLeft = 40;
+        let gameOver = true;
+
+        const keys = {};
+
+        let beacon = { x: 300, y: 200, radius: 110, vx: 2, vy: 1.5 };
+        let p1 = { x: 100, y: 200, radius: 12, score: 0, color: '#00f0ff', stun: 0, pulseCd: 0 };
+        let p2 = { x: 500, y: 200, radius: 12, score: 0, color: '#ff0055', stun: 0, pulseCd: 0, isBot: false };
+
+        window.addEventListener('keydown', (e) => { keys[e.code] = true; });
+        window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+        function resetGame() {
+            gameOver = false;
+            timeLeft = 40;
+            p1.x = 100; p1.y = 200; p1.score = 0; p1.stun = 0; p1.pulseCd = 0;
+            p2.x = 500; p2.y = 200; p2.score = 0; p2.stun = 0; p2.pulseCd = 0;
+            p2.isBot = (gameMode === 'single');
+            p2NameEl.textContent = p2.isBot ? "Bot" : "P2";
+
+            beacon.x = 300; beacon.y = 200;
+            beacon.vx = (Math.random() > 0.5 ? 2 : -2);
+            beacon.vy = (Math.random() > 0.5 ? 1.5 : -1.5);
+
+            p1ScoreEl.textContent = "0";
+            p2ScoreEl.textContent = "0";
+            timerEl.textContent = "Time: 40";
+            statusDiv.textContent = "Stay inside the moving light!";
+            statusDiv.style.color = "#ffffff";
+        }
+
+        function startGame(mode) {
+            gameMode = mode;
+            if (gameLoop) clearInterval(gameLoop);
+            if (timerInterval) clearInterval(timerInterval);
+
+            resetGame();
+            gameLoop = setInterval(update, 1000 / 60);
+            timerInterval = setInterval(() => {
+                if (!gameOver) {
+                    timeLeft--;
+                    timerEl.textContent = `Time: ${timeLeft}`;
+                    if (timeLeft <= 0) endGame();
+                }
+            }, 1000);
+        }
+
+        function movePlayers() {
+            // Player 1 WASD
+            if (p1.stun <= 0) {
+                if (keys['KeyW']) p1.y -= SPEED;
+                if (keys['KeyS']) p1.y += SPEED;
+                if (keys['KeyA']) p1.x -= SPEED;
+                if (keys['KeyD']) p1.x += SPEED;
+
+                // Arrow keys for P1 in solo mode
+                if (p2.isBot) {
+                    if (keys['ArrowUp']) p1.y -= SPEED;
+                    if (keys['ArrowDown']) p1.y += SPEED;
+                    if (keys['ArrowLeft']) p1.x -= SPEED;
+                    if (keys['ArrowRight']) p1.x += SPEED;
+                }
+            } else {
+                p1.stun--;
+            }
+
+            // Player 1 Pulse
+            if ((keys['Space'] || (p2.isBot && keys['Enter'])) && p1.pulseCd <= 0) {
+                triggerPulse(p1, p2);
+                p1.pulseCd = 180; // 3 sec cooldown
+            }
+            if (p1.pulseCd > 0) p1.pulseCd--;
+
+            // Player 2 / Bot
+            if (p2.isBot) {
+                if (p2.stun <= 0) {
+                    // Bot moves toward beacon center
+                    const dx = beacon.x - p2.x;
+                    const dy = beacon.y - p2.y;
+                    const dist = Math.hypot(dx, dy);
+                    if (dist > 10) {
+                        p2.x += (dx / dist) * (SPEED * 0.8);
+                        p2.y += (dy / dist) * (SPEED * 0.8);
+                    }
+                } else {
+                    p2.stun--;
+                }
+            } else {
+                if (p2.stun <= 0) {
+                    if (keys['ArrowUp']) p2.y -= SPEED;
+                    if (keys['ArrowDown']) p2.y += SPEED;
+                    if (keys['ArrowLeft']) p2.x -= SPEED;
+                    if (keys['ArrowRight']) p2.x += SPEED;
+                } else {
+                    p2.stun--;
+                }
+
+                if (keys['Enter'] && p2.pulseCd <= 0) {
+                    triggerPulse(p2, p1);
+                    p2.pulseCd = 180;
+                }
+                if (p2.pulseCd > 0) p2.pulseCd--;
+            }
+
+            clamp(p1);
+            clamp(p2);
+        }
+
+        function triggerPulse(attacker, defender) {
+            const dist = Math.hypot(attacker.x - defender.x, attacker.y - defender.y);
+            if (dist < 90) {
+                defender.stun = 45; // Stun for 0.75 seconds
+                if (defender.score >= 5) {
+                    defender.score -= 5;
+                    attacker.score += 5;
+                }
+            }
+        }
+
+        function clamp(p) {
+            p.x = Math.max(p.radius, Math.min(canvas.width - p.radius, p.x));
+            p.y = Math.max(p.radius, Math.min(canvas.height - p.radius, p.y));
+        }
+
+        function updateBeacon() {
+            beacon.x += beacon.vx;
+            beacon.y += beacon.vy;
+
+            if (beacon.x - beacon.radius <= 0 || beacon.x + beacon.radius >= canvas.width) beacon.vx *= -1;
+            if (beacon.y - beacon.radius <= 0 || beacon.y + beacon.radius >= canvas.height) beacon.vy *= -1;
+        }
+
+        function checkLightScore(p) {
+            const dist = Math.hypot(p.x - beacon.x, p.y - beacon.y);
+            if (dist < beacon.radius) {
+                p.score += 0.15;
+            }
+        }
+
+        function update() {
+            if (gameOver) return;
+
+            movePlayers();
+            updateBeacon();
+
+            checkLightScore(p1);
+            checkLightScore(p2);
+
+            p1ScoreEl.textContent = Math.floor(p1.score);
+            p2ScoreEl.textContent = Math.floor(p2.score);
+
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Light Beacon
+            const grad = ctx.createRadialGradient(beacon.x, beacon.y, 10, beacon.x, beacon.y, beacon.radius);
+            grad.addColorStop(0, 'rgba(255, 255, 200, 0.4)');
+            grad.addColorStop(1, 'rgba(255, 255, 200, 0.0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(beacon.x, beacon.y, beacon.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // P1
+            ctx.fillStyle = p1.stun > 0 ? '#555555' : p1.color;
+            ctx.shadowBlur = p1.stun > 0 ? 0 : 12;
+            ctx.shadowColor = p1.color;
+            ctx.beginPath();
+            ctx.arc(p1.x, p1.y, p1.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // P2
+            ctx.fillStyle = p2.stun > 0 ? '#555555' : p2.color;
+            ctx.shadowBlur = p2.stun > 0 ? 0 : 12;
+            ctx.shadowColor = p2.color;
+            ctx.beginPath();
+            ctx.arc(p2.x, p2.y, p2.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.shadowBlur = 0;
+        }
+
+        function endGame() {
+            gameOver = true;
+            clearInterval(gameLoop);
+            clearInterval(timerInterval);
+
+            const s1 = Math.floor(p1.score);
+            const s2 = Math.floor(p2.score);
+
+            if (s1 > s2) {
+                statusDiv.textContent = "Player 1 Wins!";
+                statusDiv.style.color = p1.color;
+            } else if (s2 > s1) {
+                statusDiv.textContent = p2.isBot ? "Bot Wins!" : "Player 2 Wins!";
+                statusDiv.style.color = p2.color;
+            } else {
+                statusDiv.textContent = "It's a Tie!";
+                statusDiv.style.color = "#ffffff";
+            }
+        }
+
+        draw();
+    </script>
+</body>
+</html>

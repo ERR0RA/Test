@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+/* Base canvas — dark gradient with ambient colour blobs so backdrop-filter has something to blur */
+body {
+  width:340px;
+  color:#e8e8f0;
+  font-family:'Segoe UI','SF Pro Text',-apple-system,sans-serif;
+  overflow:hidden;
+  position:relative;
+  background:
+    radial-gradient(circle at 14% 0%, rgba(0,245,255,0.38) 0%, transparent 45%),
+    radial-gradient(circle at 100% 22%, rgba(255,43,214,0.30) 0%, transparent 50%),
+    radial-gradient(circle at 50% 100%, rgba(108,255,176,0.18) 0%, transparent 55%),
+    linear-gradient(160deg, #08101a 0%, #100815 100%);
+}
+
+/* Subtle film-grain / noise overlay — keeps the glass from looking too plasticky */
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.025) 1px, transparent 0);
+  background-size: 3px 3px;
+  pointer-events:none;
+  z-index:0;
+}
+
+/* All real content sits above the noise */
+body > * { position:relative; z-index:1; }
+
+/* HEADER */
+.header {
+  background:linear-gradient(135deg, rgba(0,245,255,0.88), rgba(255,43,214,0.82));
+  padding:18px 16px 0;
+  text-align:center;
+  border-bottom:1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.logo {
+  font-size:20px; font-weight:900; color:#061016;
+  letter-spacing:0; cursor:pointer; user-select:none;
+  text-shadow: 0 0 12px rgba(255,255,255,0.4);
+}
+.sub { font-size:11px; color:rgba(255,255,255,0.65); margin-top:3px; margin-bottom:14px; }
+
+/* TABS */
+.tabs { display:flex; gap:4px; padding:0 4px; }
+.tab {
+  flex:1; padding:8px 0; border:none;
+  background:rgba(255,255,255,0.08);
+  color:rgba(255,255,255,0.65);
+  font-size:12px; font-weight:600; cursor:pointer;
+  border-radius:8px 8px 0 0;
+  border:1px solid rgba(255,255,255,0.06);
+  border-bottom:none;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition:all 0.2s ease;
+}
+.tab:hover { background:rgba(255,255,255,0.14); color:#fff; }
+.tab.active {
+  background:rgba(15,15,19,0.65);
+  color:#75f7ff;
+  border-color: rgba(0,245,255,0.36);
+}
+
+/* PANELS */
+.panel { display:none; padding:20px 16px; }
+.panel.active { display:block; }
+
+/* LABELS */
+.api-label {
+  font-size:10px; text-transform:uppercase; letter-spacing:1.2px;
+  color:rgba(232,232,240,0.45); margin-bottom:6px; font-weight:600;
+}
+
+/* INPUTS — frosted glass */
+.input-wrap { position:relative; margin-bottom:12px; }
+input[type=password], input[type=text] {
+  width:100%;
+  background: rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:10px;
+  color:#e8e8f0;
+  padding:10px 36px 10px 12px;
+  font-size:13px; outline:none;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: border-color 0.2s, background 0.2s;
+}
+input:focus {
+  border-color:rgba(0,245,255,0.65);
+  background: rgba(0,245,255,0.06);
+  box-shadow: 0 0 0 3px rgba(0,245,255,0.12);
+}
+.toggle {
+  position:absolute; right:10px; top:11px;
+  background:none; border:none; color:rgba(255,255,255,0.5);
+  cursor:pointer; font-size:14px; padding:0;
+}
+.toggle:hover { color:#75f7ff; }
+
+select {
+  width:100%;
+  background: rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:10px;
+  color:#e8e8f0;
+  padding:10px 12px;
+  font-size:12px; outline:none;
+  margin-bottom:12px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  cursor:pointer;
+}
+select option { background:#1a1a24; color:#e8e8f0; }
+
+/* PRIMARY BUTTON */
+button#save, button#savesettings {
+  width:100%;
+  background:linear-gradient(135deg, #00f5ff, #ff2bd6);
+  color:#061016; border:none; border-radius:10px;
+  padding:11px; font-size:13px; font-weight:600;
+  cursor:pointer;
+  box-shadow: 0 4px 18px rgba(0,245,255,0.32), inset 0 1px 0 rgba(255,255,255,0.28);
+  transition: transform 0.1s, box-shadow 0.2s;
+}
+button#save:hover, button#savesettings:hover {
+  box-shadow: 0 6px 24px rgba(255,43,214,0.42), inset 0 1px 0 rgba(255,255,255,0.32);
+  transform: translateY(-1px);
+}
+button#save:active, button#savesettings:active { transform: translateY(0); }
+
+.status { font-size:11px; color:#5dd49b; margin-top:8px; text-align:center; min-height:16px; }
+
+/* FEATURE LIST */
+.feature-list { list-style:none; }
+.feature-list li {
+  font-size:12px; padding:10px 0;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  display:flex; justify-content:space-between; align-items:center;
+}
+.feature-list li:last-child { border-bottom:none; }
+.feat-name { color:#d8d8e0; flex:1; }
+.feat-models { font-size:10px; color:rgba(232,232,240,0.45); text-align:right; max-width:160px; }
+
+.plan-note { font-size:11px; color:rgba(232,232,240,0.5); line-height:1.6; margin-top:12px; }
+.plan-note a { color:#75f7ff; text-decoration:none; }
+.plan-note a:hover { text-decoration:underline; }
+
+/* FOOTER */
+.footer { padding:10px 16px; text-align:center; }
+.footer a {
+  font-size:10px; color:rgba(232,232,240,0.35);
+  text-decoration:none; margin:0 6px;
+  transition: color 0.2s;
+}
+.footer a:hover { color:#75f7ff; }
+
+/* SETTINGS PANEL */
+.setting-row { margin-bottom:16px; }
+.setting-row label { font-size:11px; color:rgba(232,232,240,0.6); display:block; margin-bottom:6px; }
+.keybind-input {
+  width:100%;
+  background: rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:10px;
+  color:#e8e8f0;
+  padding:10px 12px;
+  font-size:13px; outline:none; cursor:pointer;
+  text-align:center; box-sizing:border-box;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.keybind-input:focus { border-color:rgba(124,106,247,0.6); color:#9d8cff; }
+.keybind-hint { font-size:10px; color:rgba(232,232,240,0.35); margin-top:4px; }
+.settings-status { font-size:11px; color:#5dd49b; margin-top:8px; text-align:center; min-height:16px; }
+
+/* DEV PANEL */
+#dev-password-wrap { margin-bottom:16px; }
+#dev-password-wrap input { padding-right:12px; }
+.dev-info-row {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius:10px;
+  padding:10px 12px; margin-bottom:8px;
+  font-size:12px;
+  display:flex; justify-content:space-between; align-items:center;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.dev-info-label { color:rgba(232,232,240,0.5); }
+.dev-info-value { color:#9d8cff; font-weight:600; }
+.dev-error { font-size:11px; color:#ff7799; margin-top:6px; text-align:center; min-height:16px; }
+
+/* HELP PANEL */
+.help-link { font-size:11px; color:#9d8cff; cursor:pointer; text-align:center; display:block; margin-top:10px; }
+.help-link:hover { text-decoration:underline; }
+.help-panel { display:none; margin-top:12px; }
+.help-panel.visible { display:block; }
+.help-section {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius:12px;
+  padding:12px; margin-bottom:10px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.help-section h3 { font-size:12px; color:#9d8cff; margin-bottom:6px; font-weight:600; }
+.help-section p, .help-section ol { font-size:11px; color:rgba(232,232,240,0.7); line-height:1.6; }
+.help-section ol { padding-left:16px; }
+.help-section li { margin-bottom:4px; }
+.help-section a { color:#9d8cff; text-decoration:none; }
+.help-section a:hover { text-decoration:underline; }
+.help-section .free-tag { color:#5dd49b; font-weight:600; font-size:10px; }
+.help-section .paid-tag { color:#ffb070; font-weight:600; font-size:10px; }
+.help-back { font-size:11px; color:#9d8cff; cursor:pointer; text-align:center; display:block; margin-top:8px; }
+.help-back:hover { text-decoration:underline; }
+
+/* DISCLAIMER */
+.disclaimer-box {
+  margin: 0 16px 14px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  font-size: 10px; line-height: 1.5;
+  color: rgba(232,232,240,0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.disclaimer-box b { color: rgba(232,232,240,0.65); }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo" id="logo-click">Sparx Neon</div>
+  <div class="sub">Fast AI helper for Maths, Reader, and Science</div>
+  <div class="tabs" id="tab-bar">
+    <button class="tab active" data-tab="features">Features</button>
+    <button class="tab" data-tab="api">API Key</button>
+    <button class="tab" data-tab="settings">⚙</button>
+  </div>
+</div>
+
+<div class="panel active" id="tab-features">
+  <ul class="feature-list">
+    <li><span class="feat-name">Text questions</span><span class="feat-models">All models</span></li>
+    <li><span class="feat-name">Image questions</span><span class="feat-models">Gemini, Sonnet, Haiku</span></li>
+    <li><span class="feat-name">Auto-fill answers</span><span class="feat-models">All models</span></li>
+    <li><span class="feat-name">Auto-submit</span><span class="feat-models">All models</span></li>
+    <li><span class="feat-name">Bookwork tracking</span><span class="feat-models">All models</span></li>
+    <li><span class="feat-name">Equation builder</span><span class="feat-models">All models</span></li>
+    <li><span class="feat-name">Multiple choice</span><span class="feat-models">All models</span></li>
+    <li><span class="feat-name">Sparx Reader / Science</span><span class="feat-models">Text + images</span></li>
+  </ul>
+  <div class="plan-note">Free keys: <a href="https://console.groq.com" target="_blank">Groq</a> · <a href="https://aistudio.google.com/apikey" target="_blank">Gemini</a><br>Paid keys: <a href="https://console.anthropic.com" target="_blank">Anthropic</a> (Sonnet / Haiku)</div>
+</div>
+
+<div class="panel" id="tab-api">
+  <div class="api-label">API Key</div>
+  <div class="input-wrap">
+    <input type="password" id="apiKey" placeholder="gsk_ / sk-ant- / AIza..." />
+    <button class="toggle" id="toggleKey">👁</button>
+  </div>
+  <div class="api-label">Model</div>
+  <select id="model">
+    <option value="groq">Groq GPT-OSS 120B (free, fast)</option>
+    <option value="anthropic">Claude Sonnet 4.6 (paid)</option>
+    <option value="claude-haiku">Claude Haiku 4.5 (paid, cheaper)</option>
+    <option value="gemini-flash-latest">Gemini Flash Latest (free, auto-newest)</option>
+    <option value="gemini-flash-lite-latest">Gemini Flash-Lite Latest (free, highest limit)</option>
+    <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview (free, best quality)</option>
+    <option value="gemini-2.5-flash">Gemini 2.5 Flash (free, stable)</option>
+    <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (free, stable)</option>
+  </select>
+  <button id="save">Save and Activate</button>
+  <div class="status" id="status"></div>
+  <span class="help-link" id="help-toggle">How do I get an API key?</span>
+  <div class="help-panel" id="help-panel">
+    <div class="help-section">
+      <h3>Groq <span class="free-tag">FREE</span></h3>
+      <ol>
+        <li>Go to <a href="https://console.groq.com" target="_blank">console.groq.com</a></li>
+        <li>Sign up with Google or email</li>
+        <li>Go to <b>API Keys</b> in the sidebar</li>
+        <li>Click <b>Create API Key</b>, copy it</li>
+        <li>Paste it here and select <b>Groq GPT-OSS</b></li>
+      </ol>
+      <p>Fast and free. Text questions only (no images).</p>
+    </div>
+    <div class="help-section">
+      <h3>Gemini <span class="free-tag">FREE</span></h3>
+      <ol>
+        <li>Go to <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a></li>
+        <li>Sign in with Google</li>
+        <li>Click <b>Create API Key</b>, copy it</li>
+        <li>Paste it here and select a <b>Gemini</b> model</li>
+      </ol>
+      <p>Free with generous limits. Supports images.</p>
+    </div>
+    <div class="help-section">
+      <h3>Anthropic (Claude) <span class="paid-tag">PAID</span></h3>
+      <ol>
+        <li>Go to <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></li>
+        <li>Sign up and add billing (pay-as-you-go)</li>
+        <li>Go to <b>API Keys</b></li>
+        <li>Click <b>Create Key</b>, copy it</li>
+        <li>Paste it here and select <b>Sonnet</b> or <b>Haiku</b></li>
+      </ol>
+      <p>Most accurate. Haiku is cheaper, Sonnet is smarter. Both support images.</p>
+    </div>
+    <span class="help-back" id="help-back">Back</span>
+  </div>
+</div>
+
+
+<div class="panel" id="tab-settings">
+  <div class="setting-row">
+    <label>Loading text</label>
+    <input type="text" id="loading-text" placeholder="Thinking..." style="padding-right:12px;" />
+    <div class="keybind-hint">Shown while the AI is solving</div>
+  </div>
+  <div class="setting-row">
+    <label>Error text</label>
+    <input type="text" id="error-text" placeholder="Error" style="padding-right:12px;" />
+    <div class="keybind-hint">Shown before error messages</div>
+  </div>
+  <div class="setting-row">
+    <label>Explanation style</label>
+    <select id="explain-style">
+      <option value="normal">Normal English</option>
+      <option value="british">British slang</option>
+      <option value="pirate">Pirate</option>
+      <option value="shakespeare">Shakespearean</option>
+    </select>
+  </div>
+  <div class="setting-row">
+    <label>Toggle panel keybind</label>
+    <input class="keybind-input" id="keybind" readonly placeholder="Click and press keys..." />
+    <div class="keybind-hint">Click the box and press your desired key combination</div>
+  </div>
+  <button id="savesettings">Save Settings</button>
+  <div class="settings-status" id="settings-status"></div>
+</div>
+
+<div class="panel" id="tab-dev">
+  <div id="dev-locked">
+    <div class="api-label">Developer Password</div>
+    <div id="dev-password-wrap" class="input-wrap">
+      <input type="password" id="dev-password" placeholder="Enter password..." />
+    </div>
+    <button id="dev-unlock" style="width:100%;background:linear-gradient(135deg,#7c6af7,#5b4de0);color:white;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(124,106,247,0.35),inset 0 1px 0 rgba(255,255,255,0.2);">Unlock</button>
+    <div class="dev-error" id="dev-error"></div>
+  </div>
+  <div id="dev-unlocked" style="display:none;">
+    <div class="api-label" style="margin-bottom:12px;">Developer Info</div>
+    <div class="dev-info-row"><span class="dev-info-label">Model (last question)</span><span class="dev-info-value" id="dev-model-used">—</span></div>
+    <div class="dev-info-row"><span class="dev-info-label">Image detected</span><span class="dev-info-value" id="dev-image-detected">—</span></div>
+    <div class="dev-info-row"><span class="dev-info-label">Bookwork code</span><span class="dev-info-value" id="dev-bookwork">—</span></div>
+    <div class="api-label" style="margin:16px 0 8px;">Fill Diagnostic</div>
+    <div id="dev-diag" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 12px;font-size:11px;color:rgba(232,232,240,0.7);white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">No data yet</div>
+    <button id="dev-refresh" style="width:100%;margin-top:8px;background:rgba(255,255,255,0.06);color:rgba(232,232,240,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px;font-size:11px;cursor:pointer;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);">↻ Refresh</button>
+  </div>
+</div>
+
+<div class="footer">
+  <a href="https://console.groq.com" target="_blank">Groq (free)</a>
+  <a href="https://console.anthropic.com" target="_blank">Anthropic</a>
+  <a href="https://aistudio.google.com/apikey" target="_blank">Gemini (free)</a>
+</div>
+
+<div class="disclaimer-box">
+  <b>Disclaimer.</b> Provided as-is for personal use. The user is solely responsible for the use of this extension. Using AI to complete assigned homework may violate your school's academic integrity policy and Sparx Learning's Terms of Service. The developer is not liable for any consequences, including account suspension, disciplinary action, or grade penalties. Not affiliated with Sparx Learning Ltd.
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

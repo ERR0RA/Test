@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=none">
+    <title>COSMIC DRIFT</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #020205;
+            overflow: hidden;
+            color: #fff;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        #gameCanvas {
+            display: block;
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            text-shadow: 0 0 10px #00f2ff;
+            z-index: 10;
+        }
+
+        #score {
+            font-size: 32px;
+            margin: 0;
+            font-weight: bold;
+        }
+
+        #highScore {
+            font-size: 14px;
+            margin: 0;
+            color: #6a6a8a;
+        }
+
+        #controls-hint {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            text-align: center;
+            color: #4a4a6a;
+            font-size: 14px;
+            letter-spacing: 2px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+
+        #game-over-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(2, 2, 5, 0.85);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+            z-index: 20;
+        }
+
+        #game-over-screen h1 {
+            font-size: 64px;
+            margin: 0;
+            color: #ff0055;
+            text-shadow: 0 0 20px #ff0055;
+        }
+
+        #final-score {
+            font-size: 24px;
+            color: #00f2ff;
+            margin: 20px 0;
+        }
+
+        button {
+            margin-top: 30px;
+            padding: 15px 40px;
+            background: transparent;
+            border: 2px solid #00f2ff;
+            color: #00f2ff;
+            font-family: inherit;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        button:hover {
+            background-color: #00f2ff;
+            color: #020205;
+            box-shadow: 0 0 20px #00f2ff;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <p id="score">0</p>
+        <p id="highScore">Best: 0</p>
+    </div>
+
+    <div id="controls-hint">TAP LEFT/RIGHT OR USE ARROWS</div>
+
+    <div id="game-over-screen">
+        <h1>CRASHED</h1>
+        <p id="final-score">SCORE: 0</p>
+        <button onclick="resetGame()">Try Again</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const highScoreEl = document.getElementById('highScore');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const finalScoreEl = document.getElementById('final-score');
+        const hintEl = document.getElementById('controls-hint');
+
+        let width, height, scale;
+        function resize() {
+            scale = window.devicePixelRatio || 1;
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width * scale;
+            canvas.height = height * scale;
+            ctx.scale(scale, scale);
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        let gameActive = true;
+        let score = 0;
+        let highScore = localStorage.getItem('cosmicDriftBest') || 0;
+        highScoreEl.innerText = `Best: ${highScore}`;
+        
+        const SHIP_SIZE = 15;
+        const THRUST = 0.4;
+        const FRICTION = 0.98;
+        const OBSTACLE_SPEED_BASE = 4;
+
+        let ship = { x: width / 2, y: height - 120, vx: 0, w: SHIP_SIZE, h: SHIP_SIZE * 1.5, thruster: 0 };
+        let stars = [];
+        let debris = [];
+        let particles = [];
+
+        function initStars() {
+            stars = [];
+            for (let i = 0; i < 80; i++) {
+                stars.push({ x: Math.random() * width, y: Math.random() * height, size: Math.random() * 2, speed: Math.random() * 0.5 + 0.1 });
+            }
+        }
+
+        const handleInputStart = (isLeft) => {
+            if (!gameActive) return;
+            hintEl.style.display = 'none';
+            ship.thruster = isLeft ? -1 : 1;
+        };
+        const handleInputEnd = () => { ship.thruster = 0; };
+
+        window.addEventListener('mousedown', (e) => handleInputStart(e.clientX < width / 2));
+        window.addEventListener('mouseup', handleInputEnd);
+        window.addEventListener('touchstart', (e) => { e.preventDefault(); handleInputStart(e.touches[0].clientX < width / 2); }, {passive: false});
+        window.addEventListener('touchend', handleInputEnd);
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') handleInputStart(true);
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') handleInputStart(false);
+            if (e.code === 'Space' && !gameActive) resetGame();
+        });
+        window.addEventListener('keyup', handleInputEnd);
+
+        function spawnDebris() {
+            const size = Math.random() * 40 + 25;
+            debris.push({ x: Math.random() * (width - size), y: -size, w: size, h: size, speed: OBSTACLE_SPEED_BASE + (score / 20), rot: Math.random() * Math.PI, rotSpd: (Math.random() - 0.5) * 0.05 });
+        }
+
+        function spawnParticles(x, y, color, count = 5) {
+            for(let i=0; i < count; i++) {
+                particles.push({ x, y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, life: 30, color });
+            }
+        }
+
+        function resetGame() {
+            score = 0; scoreEl.innerText = score;
+            gameActive = true; debris = []; particles = [];
+            ship.x = width / 2; ship.vx = 0;
+            gameOverScreen.style.display = 'none';
+            initStars();
+            loop();
+        }
+
+        function gameOver() {
+            gameActive = false;
+            finalScoreEl.innerText = `SCORE: ${score}`;
+            gameOverScreen.style.display = 'flex';
+            spawnParticles(ship.x, ship.y, '#ff0055', 20);
+            if (score > highScore) {
+                highScore = score;
+                highScoreEl.innerText = `Best: ${highScore}`;
+                localStorage.setItem('cosmicDriftBest', highScore);
+            }
+        }
+
+        let frame = 0;
+        function loop() {
+            if (!gameActive) return;
+            frame++;
+
+            if (ship.thruster === -1) ship.vx -= THRUST;
+            if (ship.thruster === 1) ship.vx += THRUST;
+            ship.vx *= FRICTION;
+            ship.x += ship.vx;
+
+            if (ship.x > width) ship.x = 0;
+            if (ship.x < 0) ship.x = width;
+
+            if (frame % Math.max(10, 50 - Math.floor(score/4)) === 0) spawnDebris();
+
+            ctx.fillStyle = '#020205';
+            ctx.fillRect(0, 0, width, height);
+
+            stars.forEach(s => {
+                s.y += s.speed;
+                if (s.y > height) s.y = 0;
+                ctx.fillStyle = `rgba(255, 255, 255, ${s.size/2})`;
+                ctx.fillRect(s.x, s.y, s.size, s.size);
+            });
+
+            particles.forEach((p, i) => {
+                p.x += p.vx; p.y += p.vy; p.life--;
+                ctx.globalAlpha = p.life / 30;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, 2, 2);
+                if(p.life <= 0) particles.splice(i, 1);
+            });
+            ctx.globalAlpha = 1;
+
+            ctx.save();
+            ctx.translate(ship.x, ship.y);
+            ctx.rotate(ship.vx * 0.03);
+            ctx.shadowBlur = 15; ctx.shadowColor = '#00f2ff';
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.moveTo(0, -ship.h/2); ctx.lineTo(ship.w/2, ship.h/2); ctx.lineTo(-ship.w/2, ship.h/2);
+            ctx.closePath(); ctx.fill();
+            ctx.restore();
+
+            debris.forEach((d, i) => {
+                d.y += d.speed; d.rot += d.rotSpd;
+                if (ship.x + 5 > d.x && ship.x - 5 < d.x + d.w && ship.y + 5 > d.y && ship.y - 5 < d.y + d.h) {
+                    gameOver();
+                }
+                if (d.y > height) { debris.splice(i, 1); score++; scoreEl.innerText = score; }
+                ctx.save();
+                ctx.translate(d.x + d.w/2, d.y + d.h/2);
+                ctx.rotate(d.rot);
+                ctx.strokeStyle = '#6a6a8a';
+                ctx.strokeRect(-d.w/2, -d.h/2, d.w, d.h);
+                ctx.restore();
+            });
+
+            requestAnimationFrame(loop);
+        }
+
+        initStars();
+        loop();
+    </script>
+</body>
+</html>

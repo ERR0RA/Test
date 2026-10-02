@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="manifest" href="manifest.json">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Nebula | Ultimate Cloud Gaming Hub</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;500;700;800&family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #00ff66;
+      --primary-glow: rgba(0, 255, 102, 0.85);
+      --bg: #030407;
+      --glass-border: rgba(0, 255, 102, 0.25);
+      --glass-bg: rgba(5, 12, 8, 0.4);
+      --text: #ffffff;
+      --bg0: #020305; --bg1: #050b14; --bg2: #0f0518;
+      --secondary: #00f0ff; --secondary-glow: rgba(0, 240, 255, 0.75);
+      --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    [data-theme="cyber"] { --primary:#ff00a0; --primary-glow:rgba(255,0,160,0.9); --secondary:#00ffff; --secondary-glow:rgba(0,255,255,0.8); --glass-border:rgba(255,0,160,0.3); --bg0:#08000b; }
+    [data-theme="ocean"] { --primary:#00f0ff; --primary-glow:rgba(0,240,255,0.9); --secondary:#00ffaa; --secondary-glow:rgba(0,255,170,0.8); --glass-border:rgba(0,240,255,0.3); --bg0:#000910; }
+    [data-theme="amber"] { --primary:#ffaa00; --primary-glow:rgba(255,170,0,0.9); --secondary:#ff0055; --secondary-glow:rgba(255,0,85,0.8); --glass-border:rgba(255,170,0,0.3); --bg0:#100600; }
+    [data-theme="crimson"] { --primary:#ff003c; --primary-glow:rgba(255,0,60,0.9); --secondary:#ffcc00; --secondary-glow:rgba(255,204,0,0.8); --glass-border:rgba(255,0,60,0.3); --bg0:#100003; }
+    [data-theme="violet"] { --primary:#a855f7; --primary-glow:rgba(168,85,247,0.9); --secondary:#00d8ff; --secondary-glow:rgba(0,216,255,0.8); --glass-border:rgba(168,85,247,0.3); --bg0:#080214; }
+    [data-theme="lime"] { --primary:#ccff00; --primary-glow:rgba(204,255,0,0.9); --secondary:#00ffaa; --secondary-glow:rgba(0,255,170,0.8); --glass-border:rgba(204,255,0,0.3); --bg0:#050900; }
+    [data-theme="ice"] { --primary:#38bdf8; --primary-glow:rgba(56,189,248,0.9); --secondary:#e087ff; --secondary-glow:rgba(224,135,255,0.8); --glass-border:rgba(56,189,248,0.3); --bg0:#010a12; }
+    [data-theme="gold"] { --primary:#ffcc00; --primary-glow:rgba(255,204,0,0.9); --secondary:#ff6600; --secondary-glow:rgba(255,102,0,0.8); --glass-border:rgba(255,204,0,0.3); --bg0:#0a0700; }
+    [data-theme="rose"] { --primary:#ff007f; --primary-glow:rgba(255,0,127,0.9); --secondary:#9d00ff; --secondary-glow:rgba(157,0,255,0.8); --glass-border:rgba(255,0,127,0.3); --bg0:#100008; }
+    [data-theme="emerald"] { --primary:#00ff88; --primary-glow:rgba(0,255,136,0.9); --secondary:#00f0ff; --secondary-glow:rgba(0,240,255,0.8); --glass-border:rgba(0,255,136,0.3); --bg0:#000c06; }
+    [data-theme="toxic"] { --primary:#a6ff00; --primary-glow:rgba(166,255,0,0.95); --secondary:#00ff55; --secondary-glow:rgba(0,255,85,0.85); --glass-border:rgba(166,255,0,0.3); --bg0:#040a00; }
+    [data-theme="midnight"] { --primary:#818cf8; --primary-glow:rgba(129,140,248,0.9); --secondary:#f472b6; --secondary-glow:rgba(244,114,182,0.8); --glass-border:rgba(129,140,248,0.3); --bg0:#030511; }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    
+    body {
+      margin: 0; min-height: 100vh; overflow-x: hidden;
+      font-family: "Plus Jakarta Sans", sans-serif;
+      background: var(--bg0); color: var(--text);
+      transition: background 0.5s ease; padding-bottom: 180px;
+    }
+    
+    body.custom-cursor { cursor: none; }
+    body.custom-cursor a, body.custom-cursor button { cursor: none; }
+
+    #bgCanvas { position: fixed; inset: 0; pointer-events: none; z-index: -1; opacity: 0; transition: opacity 0.8s ease; }
+    body[data-bg="matrix"] #bgCanvas, body[data-bg="void"] #bgCanvas, body[data-bg="supernova"] #bgCanvas, body[data-bg="aurora"] #bgCanvas, body[data-bg="shattered"] #bgCanvas { opacity: 0.95; }
+
+    /* REAL NEON ENGINE OVERLAY */
+    body[data-bg="neon"]::before {
+      content: ""; position: fixed; inset: 0; z-index: -2;
+      background: 
+        radial-gradient(circle at 20% 20%, var(--primary-glow) 0%, transparent 40%),
+        radial-gradient(circle at 80% 80%, var(--secondary-glow) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.05) 0%, transparent 60%);
+      animation: neonPulse 4s infinite alternate ease-in-out;
+      filter: blur(40px);
+    }
+    @keyframes neonPulse { 
+      0% { opacity: 0.6; transform: scale(0.98); } 
+      100% { opacity: 1; transform: scale(1.02); } 
+    }
+    body[data-bg="neon"] { background: linear-gradient(135deg, var(--bg0) 0%, #03050a 50%, #06020c 100%); }
+
+    /* SHATTERED ENGINE */
+    body[data-bg="shattered"] { background: #010203; }
+
+    /* DYNAMIC GROWING CURSOR BLACK HOLE */
+    .cursor-dot, .cursor-ring { 
+      position: fixed; top: 0; left: 0; pointer-events: none; z-index: 10000; 
+      transform: translate(-50%, -50%); opacity: 0; transition: opacity 0.3s ease; 
+    }
+    body.custom-cursor .cursor-dot, body.custom-cursor .cursor-ring { opacity: 1; }
+    
+    .cursor-dot { 
+      width: 16px; height: 16px; background: #000000; border-radius: 50%; 
+      box-shadow: 0 0 0 2px var(--primary), 0 0 12px var(--primary-glow), inset 0 0 8px #000;
+      transition: width 0.1s ease-out, height 0.1s ease-out;
+    }
+    
+    .cursor-ring { 
+      width: 38px; height: 38px; border: 2px solid var(--secondary); border-radius: 50%; 
+      box-shadow: 0 0 15px var(--secondary-glow), inset 0 0 10px var(--primary-glow); 
+      transition: width 0.1s ease-out, height 0.1s ease-out, border-color 0.3s, box-shadow 0.3s; 
+      animation: cursorSpin 6s linear infinite;
+    }
+    @keyframes cursorSpin {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    /* SPLASH OVERLAY */
+    #splashOverlay {
+      position: fixed; inset: 0; display: flex;
+      align-items: center; justify-content: center; z-index: 9999;
+      background: #020305; transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.6s;
+    }
+    .splash-logo-container {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      position: relative;
+      width: clamp(280px, 45vw, 360px); height: clamp(280px, 45vw, 360px);
+      background: rgba(2, 3, 5, 0.9);
+      border: 2px solid var(--primary);
+      box-shadow: 0 0 20px var(--primary), 0 0 50px var(--primary-glow), inset 0 0 25px var(--primary-glow);
+      border-radius: 32px;
+      backdrop-filter: blur(25px);
+      animation: logoContainerPulse 2s 4.4s infinite alternate ease-in-out;
+    }
+    .splash-text-wrapper { position: relative; z-index: 2; text-align: center; opacity: 0; animation: nebulaReveal 0.8s 3.7s both; }
+    .splash-square { position: absolute; left: 50%; top: 50%; width: 116px; height: 116px; border: 2px solid var(--primary); border-radius: 4px; box-shadow: 0 0 18px var(--primary), 0 0 42px var(--primary-glow), inset 0 0 18px var(--primary-glow); animation: squareFormation 3.8s cubic-bezier(.65,0,.35,1) both; }
+    @keyframes squareFormation { 0% { opacity:0; transform:translate(-145%,-145%) rotate(0) scale(.7); } 10% { opacity:1; } 32% { transform:translate(45%,-145%) rotate(90deg) scale(.82); } 55% { transform:translate(45%,45%) rotate(180deg) scale(.95); } 76% { transform:translate(-50%,-50%) rotate(270deg) scale(1.16); border-radius:50%; } 90%,100% { opacity:0; transform:translate(-50%,-50%) rotate(360deg) scale(.28); border-radius:50%; } }
+    @keyframes nebulaReveal { 0% { opacity:0; transform:scale(.65); filter:blur(8px); } 100% { opacity:1; transform:scale(1); filter:blur(0); } }
+    @media (prefers-reduced-motion: reduce) { .splash-square { animation-duration: 1ms; } .splash-text-wrapper { animation-delay: 1ms; } }
+    .splash-logo { 
+      font-size: clamp(3rem, 8vw, 4.5rem); font-weight: 800; margin: 0; letter-spacing: -2px; color: #ffffff; 
+      text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 20px var(--primary), 0 0 40px var(--primary), 0 0 80px var(--primary);
+    }
+    .splash-sub { 
+      letter-spacing: 5px; opacity: 0.9; font-size: 0.75rem; margin-top: 14px; font-weight: 700; color: #fff; 
+      text-shadow: 0 0 8px var(--secondary-glow);
+    }
+    @keyframes logoContainerPulse { 
+      0% { transform: rotate(22.5deg) scale(0.98); box-shadow: 0 0 20px var(--primary), 0 0 40px var(--primary-glow), inset 0 0 15px var(--primary-glow); } 
+      100% { transform: rotate(22.5deg) scale(1.02); box-shadow: 0 0 35px var(--primary), 0 0 80px var(--primary-glow), inset 0 0 35px var(--primary-glow); } 
+    }
+
+    /* NAVIGATION & UI */
+    #mainAppContent { opacity: 0; transition: opacity 0.5s ease; padding-top: 40px; }
+    .top-nav {
+      position: sticky; top: 20px; margin: 0 auto; z-index: 1001;
+      display: flex; gap: 8px; background: rgba(2, 3, 5, 0.85);
+      padding: 6px; border-radius: 30px; border: 1px solid var(--glass-border);
+      backdrop-filter: blur(20px); width: max-content;
+      box-shadow: 0 0 20px rgba(0,0,0,0.8), 0 0 15px var(--glass-border);
+    }
+    .nav-btn {
+      background: transparent; border: none; color: rgba(255,255,255,0.7);
+      padding: 10px 24px; border-radius: 20px; font-weight: 700;
+      font-size: 0.85rem; cursor: pointer; transition: var(--transition);
+      letter-spacing: 1px; font-family: "Plus Jakarta Sans", sans-serif;
+    }
+    .nav-btn:hover { color: #fff; text-shadow: 0 0 10px #fff; }
+    .nav-btn.active {
+      background: var(--primary); color: #000; font-weight: 800;
+      box-shadow: 0 0 15px var(--primary), 0 0 30px var(--primary-glow);
+    }
+
+    header { padding: 40px 20px 10px; text-align: center; }
+    h1 { 
+      font-size: clamp(3.5rem, 10vw, 6.5rem); margin: 0; font-weight: 800; letter-spacing: -3px; color: #ffffff;
+      text-shadow: 0 0 5px #fff, 0 0 15px #fff, 0 0 30px var(--primary), 0 0 60px var(--primary), 0 0 100px var(--primary);
+    }
+
+    .view-section { display: none; opacity: 0; transition: opacity 0.4s ease; }
+    .view-section.active-view { display: block; opacity: 1; }
+
+    /* LINK CARDS GRID WITH REAL NEON BORDERS */
+    .search-wrap { width: min(90%, 580px); margin: 30px auto; position: relative; }
+    #moduleSearch {
+      width: 100%; padding: 18px 28px; border-radius: 999px; border: 1.5px solid var(--glass-border);
+      background: rgba(5, 10, 15, 0.6); color: white; outline: none; text-align: center; 
+      backdrop-filter: blur(20px); font-size: 1rem; transition: var(--transition);
+      box-shadow: 0 0 15px rgba(0,0,0,0.5), inset 0 0 10px rgba(0,0,0,0.8);
+    }
+    #moduleSearch:focus { 
+      border-color: var(--primary); 
+      box-shadow: 0 0 20px var(--primary-glow), 0 0 40px var(--primary-glow), inset 0 0 10px var(--primary-glow); 
+      background: rgba(10, 20, 25, 0.8); 
+    }
+
+    .link-container { width: min(94%, 1280px); margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; perspective: 1000px; }
+    .game-link {
+      position: relative; min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-decoration: none; color: white; border-radius: 20px; border: 1.5px solid var(--glass-border);
+      background: var(--glass-bg); backdrop-filter: blur(20px); transition: transform 0.2s cubic-bezier(0.2,0,0.2,1), border-color 0.3s, box-shadow 0.3s; padding: 20px;
+      overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.5); transform-style: preserve-3d;
+    }
+    .game-link::before {
+      content: ''; position: absolute; inset: 0; background: radial-gradient(800px circle at var(--x, 0px) var(--y, 0px), rgba(255,255,255,0.15), transparent 40%);
+      pointer-events: none; opacity: 0; transition: opacity 0.3s ease;
+    }
+    .game-link:hover::before { opacity: 1; }
+    .game-link:hover { 
+      border-color: var(--primary); 
+      box-shadow: 0 0 15px var(--primary), 0 0 35px var(--primary-glow), inset 0 0 15px var(--primary-glow); 
+      background: rgba(10, 25, 18, 0.5); 
+    }
+    
+    .tag-badge { 
+      position: absolute; top: 12px; right: 12px; font-size: 9px; background: var(--primary); color: black; 
+      padding: 3px 10px; border-radius: 8px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; 
+      box-shadow: 0 0 10px var(--primary), 0 0 20px var(--primary-glow); 
+    }
+    .game-title { 
+      font-weight: 700; font-size: 1.1rem; letter-spacing: -0.2px; text-align: center; margin-top: 10px; pointer-events: none; 
+      transition: text-shadow 0.3s;
+    }
+    .game-link:hover .game-title {
+      text-shadow: 0 0 8px #fff, 0 0 15px var(--primary);
+    }
+
+    /* EVENTS & LEADERBOARDS */
+    .events-panel {
+      width: min(92%, 800px); margin: 40px auto; 
+      background: rgba(3, 6, 10, 0.6); border: 1.5px solid var(--glass-border);
+      border-radius: 28px; padding: 40px; backdrop-filter: blur(30px);
+      box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 25px rgba(0,255,102,0.03);
+    }
+    .event-card { border-left: 4px solid var(--primary); padding-left: 24px; margin-bottom: 20px; filter: drop-shadow(0 0 10px var(--primary-glow)); }
+    .event-card h3 { margin: 0 0 12px 0; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; text-shadow: 0 0 10px var(--primary-glow); }
+    .rules-list { list-style: none; padding: 0; margin: 24px 0 0 0; }
+    .rules-list li { position: relative; padding-left: 28px; margin-bottom: 14px; font-size: 0.95rem; line-height: 1.6; color: rgba(255,255,255,0.85); }
+    .rules-list li::before { content: "✓"; position: absolute; left: 0; top: 2px; color: var(--primary); font-weight: bold; font-size: 1rem; text-shadow: 0 0 8px var(--primary); }
+
+    .leaderboard-section { margin-top: 50px; padding-top: 40px; border-top: 1px solid var(--glass-border); }
+    .leaderboard-title { 
+      font-size: 1.6rem; font-weight: 800; text-align: center; margin-bottom: 35px; letter-spacing: 3px; color: #fff;
+      text-shadow: 0 0 10px #fff, 0 0 20px var(--primary), 0 0 40px var(--primary-glow); 
+    }
+    .leaderboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+    .leaderboard-box { background: rgba(0, 0, 0, 0.4); border: 1px solid var(--glass-border); border-radius: 20px; padding: 22px; backdrop-filter: blur(10px); box-shadow: 0 0 15px rgba(0,0,0,0.5); }
+    .leaderboard-box h4 { margin: 0 0 18px 0; font-size: 1rem; font-weight: 800; letter-spacing: 1px; color: var(--primary); border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; text-transform: uppercase; text-shadow: 0 0 8px var(--primary-glow); }
+    .leaderboard-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.9rem; font-family: "Fira Code", monospace; }
+    .leaderboard-row:last-child { border-bottom: none; }
+    .rank-num { font-weight: 700; color: rgba(255,255,255,0.4); margin-right: 8px; }
+    .leaderboard-row:nth-child(2) .rank-num { color: #ffd700; text-shadow: 0 0 10px rgba(255,215,0,0.8); } 
+    .leaderboard-row:nth-child(3) .rank-num { color: #c0c0c0; text-shadow: 0 0 10px rgba(192,192,192,0.8); } 
+    .leaderboard-row:nth-child(4) .rank-num { color: #cd7f32; text-shadow: 0 0 10px rgba(205,127,50,0.8); } 
+    .player-name { font-weight: 500; color: rgba(255, 255, 255, 0.9); }
+    .player-score { font-weight: 700; color: var(--primary); text-shadow: 0 0 8px var(--primary-glow); }
+
+    /* FOOTER & BOTTOM CONTROLS */
+    .credits-section { text-align: center; margin-top: 100px; padding: 50px 20px; border-top: 1px solid var(--glass-border); background: rgba(2, 3, 5, 0.85); backdrop-filter: blur(20px); }
+    .credits-section p { font-size: 0.85rem; opacity: 0.6; margin: 12px 0; max-width: 700px; margin-left: auto; margin-right: auto; line-height: 1.6; }
+    .wa-link { color: var(--primary); text-decoration: none; font-weight: 700; transition: var(--transition); border-bottom: 1px dashed var(--primary); padding-bottom: 2px; text-shadow: 0 0 8px var(--primary-glow); }
+    .wa-link:hover { color: #fff; border-color: #fff; text-shadow: 0 0 12px #fff; }
+
+    .bottom-controls { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 1000; align-items: center; width: min(95%, 680px); }
+    .panel { background: rgba(2, 4, 7, 0.9); backdrop-filter: blur(25px); border: 1.5px solid var(--glass-border); border-radius: 999px; padding: 8px 16px; display: flex; align-items: center; gap: 8px; max-width: 100%; overflow-x: auto; scrollbar-width: none; box-shadow: 0 0 25px rgba(0,0,0,0.9), 0 0 15px var(--glass-border); }
+    .panel::-webkit-scrollbar { display: none; }
+    .bg-btn { background: rgba(255,255,255,.05); border: 1px solid transparent; color: rgba(255,255,255,0.7); padding: 8px 16px; border-radius: 999px; font-weight: 700; font-size: 10px; cursor: pointer; transition: var(--transition); letter-spacing: 0.5px; }
+    .bg-btn:hover { color: #fff; background: rgba(255,255,255,0.15); text-shadow: 0 0 8px #fff; }
+    .bg-btn.active { background: var(--primary); color: #000; font-weight: 800; box-shadow: 0 0 10px var(--primary), 0 0 20px var(--primary-glow); }
+    .t-btn { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); cursor: pointer; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s; flex-shrink: 0; }
+    .t-btn:hover { transform: scale(1.3); box-shadow: 0 0 12px currentColor; }
+
+    @media (max-width: 768px) {
+      body { padding-bottom: 240px; }
+      .link-container { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; padding: 0 10px; }
+      .game-link { min-height: 110px; padding: 12px; border-radius: 16px; }
+      .tag-badge { top: 8px; right: 8px; font-size: 8px; padding: 1px 6px; }
+      .game-title { font-size: 0.9rem; margin-top: 5px; }
+      header { padding-top: 30px; }
+      .events-panel { padding: 24px; width: 94%; }
+      .bottom-controls { width: 92%; bottom: 16px; }
+      .panel { padding: 6px 12px; gap: 6px; width: 100%; }
+      .bg-btn { padding: 6px 12px; font-size: 9px; }
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="bgCanvas"></canvas>
+  <div class="cursor-dot"></div>
+  <div class="cursor-ring"></div>
+
+  <div id="splashOverlay">
+    <div class="splash-logo-container splash-forming">
+      <div class="splash-square" aria-hidden="true"></div>
+      <div class="splash-text-wrapper">
+        <div class="splash-logo">Nebula</div>
+        <div class="splash-sub">CLOUD GAMING HUB</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="mainAppContent">
+    <div class="top-nav">
+      <button class="nav-btn active" id="btnGames" onclick="switchTab('games')">GAMES</button>
+      <button class="nav-btn" id="btnEvents" onclick="switchTab('events')">EVENTS</button>
+    </div>
+
+    <header>
+      <h1>Nebula</h1>
+      <p style="letter-spacing: 6px; opacity: 0.8; font-size: 0.75rem; font-weight: 700; margin-top: 5px; color: var(--secondary); text-shadow: 0 0 10px var(--secondary-glow);">CLOUD GAMING HUB</p>
+    </header>
+
+    <main>
+      <section id="gamesSection" class="view-section active-view">
+        <div class="search-wrap">
+          <input type="text" id="moduleSearch" placeholder="Search catalog..." oninput="filterGames()" autocomplete="off">
+        </div>
+        <div id="gameGrid" class="link-container"></div>
+      </section>
+
+      <section id="eventsSection" class="view-section">
+        <div class="events-panel">
+          <div class="event-card">
+            <h3>High-Score Submission Rule</h3>
+            <p style="opacity: 0.75; font-size: 0.95rem; margin-bottom: 15px; line-height: 1.5;">To keep leadership brackets clean, verified, and clear of exploits, explicit video criteria must be fulfilled upon submission.</p>
+            <ul class="rules-list">
+              <li>If you are reaching high scores, you must clip your dynamic performance.</li>
+              <li>You are required to send the <strong>last 2 seconds</strong> of your standard gameplay loop clip.</li>
+              <li>You must also include your direct <strong>death clip</strong> inside the exact same payload.</li>
+              <li>Send all entries to <strong style="color: var(--primary); text-shadow: 0 0 8px var(--primary-glow);">nebulaos.main@gmail.com</strong> with your first and last name.</li>
+            </ul>
+          </div>
+
+          <div class="leaderboard-section">
+            <div class="leaderboard-title">HUB LEADERBOARDS</div>
+            <div class="leaderboard-grid">
+              
+              <div class="leaderboard-box">
+                <h4>BLOCK BREAKER</h4>
+                <div class="leaderboard-row">
+                  <div><span class="rank-num">01</span><span class="player-name">Ayden K</span></div>
+                  <span class="player-score">5235</span>
+                </div>
+                <div class="leaderboard-row">
+                  <div><span class="rank-num">02</span><span class="player-name">—</span></div>
+                  <span class="player-score">0</span>
+                </div>
+                <div class="leaderboard-row">
+                  <div><span class="rank-num">03</span><span class="player-name">—</span></div>
+                  <span class="player-score">0</span>
+                </div>
+              </div>
+
+              <div class="leaderboard-box">
+                <h4>NEON SLASH</h4>
+                <div class="leaderboard-row">
+                  <div><span class="rank-num">01</span><span class="player-name">—</span></div>
+                  <span class="player-score">0</span>
+                </div>
+                <div class="leaderboard-row">
+                  <div><span class="rank-num">02</span><span class="player-name">—</span></div>
+                  <span class="player-score">0</span>
+                </div>
+                <div class="leaderboard-row">
+                  <div><span class="rank-num">03</span><span class="player-name">—</span></div>
+                  <span class="player-score">0</span>
+                </div>
+              </div>
+
+              <div class="leaderboard-box">
+                <h4>NEON HEX</h4>
+                <div class="leaderboard-row">
+                  <div><span class="rank-num">01</span><span class="player-name">—</span></div>
+                  <span class="player-score">0</span>
+                </div>
+                <div class="leaderboard-row">
+                  <div><span class="rank-num">02</span><span class="player-name">—</span></div>
+                  <span class="player-score">0</span>
+                </div>
+                <div class="leaderboard-row">
+                  <div><span class="rank-num">03</span><span class="player-name">—</span></div>
+                  <span class="player-score">0</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="credits-section">
+      <p>These platforms are built using specialized artificial intelligence systems combined with native programmatic logical overrides. All structural rights are strictly reserved to OWNER: DC/ERR0RA currently.</p>
+      <p>Note: We are operating as the managing deployment <b>Editor</b> for Neon Sparx core modules, not the foundational builder.</p>
+      <p>By interacting with these interfaces, you recognize complete operating responsibility; execution hazards are strictly assigned away from creators.</p>
+    </footer>
+
+    <div class="bottom-controls">
+      <div class="panel">
+        <div class="t-btn" style="background:#00ff66; box-shadow: 0 0 8px #00ff66;" onclick="setTheme('default')" title="Default Green"></div>
+        <div class="t-btn" style="background:#ff00a0; box-shadow: 0 0 8px #ff00a0;" onclick="setTheme('cyber')" title="Cyberpunk"></div>
+        <div class="t-btn" style="background:#00f0ff; box-shadow: 0 0 8px #00f0ff;" onclick="setTheme('ocean')" title="Deep Ocean"></div>
+        <div class="t-btn" style="background:#ffaa00; box-shadow: 0 0 8px #ffaa00;" onclick="setTheme('amber')" title="Amber Core"></div>
+        <div class="t-btn" style="background:#ff003c; box-shadow: 0 0 8px #ff003c;" onclick="setTheme('crimson')" title="Crimson Flare"></div>
+        <div class="t-btn" style="background:#a855f7; box-shadow: 0 0 8px #a855f7;" onclick="setTheme('violet')" title="Void Purple"></div>
+        <div class="t-btn" style="background:#ccff00; box-shadow: 0 0 8px #ccff00;" onclick="setTheme('lime')" title="Toxic Lime"></div>
+        <div class="t-btn" style="background:#38bdf8; box-shadow: 0 0 8px #38bdf8;" onclick="setTheme('ice')" title="Glacial Ice"></div>
+        <div class="t-btn" style="background:#ffcc00; box-shadow: 0 0 8px #ffcc00;" onclick="setTheme('gold')" title="Lux Gold"></div>
+        <div class="t-btn" style="background:#ff007f; box-shadow: 0 0 8px #ff007f;" onclick="setTheme('rose')" title="Synth Rose"></div>
+        <div class="t-btn" style="background:#00ff88; box-shadow: 0 0 8px #00ff88;" onclick="setTheme('emerald')" title="Emerald Matrix"></div>
+        <div class="t-btn" style="background:#a6ff00; box-shadow: 0 0 8px #a6ff00;" onclick="setTheme('toxic')" title="Nuclear Radioactive"></div>
+      </div>
+      <div class="panel">
+        <button class="bg-btn" id="bg-neon" onclick="setBg('neon')">NEON</button>
+        <button class="bg-btn" id="bg-shattered" onclick="setBg('shattered')">SHATTERED</button>
+        <button class="bg-btn" id="bg-matrix" onclick="setBg('matrix')">MATRIX</button>
+        <button class="bg-btn" id="bg-void" onclick="setBg('void')">VOID</button>
+        <button class="bg-btn" id="bg-supernova" onclick="setBg('supernova')">SUPERNOVA</button>
+        <button class="bg-btn" id="bg-aurora" onclick="setBg('aurora')">AURORA</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Register the companion service worker for offline use when served over HTTPS or localhost.
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {}));
+    }
+    const games = [
+      { name: "Minesweeper", url: "minesweeper.html", tag: "best" },
+      { name: "Neon Snake", url: "snake.html", tag: "Ultimate" },
+      { name: "Star Dodger", url: "Star.html", tag: "Ultimate" },
+      { name: "Neon Pong", url: "Neon-Pong.html", tag: "best" },
+      { name: "Neon Slash", url: "Neon-Slash.html", tag: "" },
+      { name: "Block Breaker", url: "blockbreaker.html", tag: "" },
+      { name: "Neon Golf", url: "Neon-Golf.html", tag: "" },
+      { name: "Neon Trail", url: "neon-trail.html", tag: "Ultimate" },
+      { name: "Neon Run", url: "ai.html", tag: "" },
+      { name: "Tic Tac Toe", url: "tictactoe.html", tag: "" },
+      { name: "Neon Hex", url: "Neon-Hex.html", tag: "" }
+    ];
+
+    function renderGames(list) {
+      const container = document.getElementById('gameGrid');
+      container.innerHTML = '';
+      list.forEach(game => {
+        const card = document.createElement('a');
+        card.className = 'game-link';
+        card.href = game.url;
+        card.innerHTML = `
+          ${game.tag ? `<div class="tag-badge">${game.tag}</div>` : ''}
+          <div class="game-title">${game.name}</div>
+        `;
+        
+        card.addEventListener('mousemove', (e) => {
+          const rect = card.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          card.style.setProperty('--x', `${x}px`);
+          card.style.setProperty('--y', `${y}px`);
+          
+          const centerX = rect.width / 2;
+          const centerY = rect.height / 2;
+          const rotateX = ((y - centerY) / centerY) * -10;
+          const rotateY = ((x - centerX) / centerX) * 10;
+          
+          card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(8px)`;
+        });
+
+        card.addEventListener('mouseleave', () => {
+          card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateZ(0px)';
+        });
+
+        container.appendChild(card);
+      });
+    }
+
+    function filterGames() {
+      const term = document.getElementById('moduleSearch').value.toLowerCase();
+      const filtered = games.filter(g => g.name.toLowerCase().includes(term));
+      renderGames(filtered);
+    }
+
+    // CURSOR LOGIC & MOUSE TRACKING
+    const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || window.matchMedia("(pointer: coarse)").matches;
+    const dot = document.querySelector(".cursor-dot");
+    const ring = document.querySelector(".cursor-ring");
+    let mousePos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    
+    document.addEventListener("mousemove", (e) => {
+      mousePos.x = e.clientX;
+      mousePos.y = e.clientY;
+
+      if (!isTouch) {
+        dot.style.left = `${e.clientX}px`;
+        dot.style.top = `${e.clientY}px`;
+        
+        ring.animate({
+          left: `${e.clientX}px`,
+          top: `${e.clientY}px`
+        }, { duration: 100, fill: "forwards" });
+      }
+    });
+
+    if (!isTouch) {
+      document.body.classList.add('custom-cursor');
+    }
+
+    // RENDERING ENGINE
+    const canvas = document.getElementById('bgCanvas');
+    const ctx = canvas.getContext('2d');
+    let width, height, columns, drops;
+    let auroraWaves = [], shards = [];
+    let novaAngle = 0, neonHue = 0;
+
+    // GROWING MOUSE BLACK HOLE STATE
+    const voidState = {
+      cursorMass: 0,
+      baseRadius: 16,
+      currentRadius: 16,
+      maxRadius: 120,
+      orbs: [],
+      maxOrbs: 180,
+      spawnTimer: 0
+    };
+
+    function createVoidOrb(w, h) {
+      const edge = Math.floor(Math.random() * 4);
+      let x, y;
+
+      if (edge === 0) { x = Math.random() * w; y = -20; }
+      else if (edge === 1) { x = w + 20; y = Math.random() * h; }
+      else if (edge === 2) { x = Math.random() * w; y = h + 20; }
+      else { x = -20; y = Math.random() * h; }
+
+      return {
+        x, y,
+        size: Math.random() * 3 + 1.5,
+        vx: (Math.random() - 0.5) * 1.5,
+        vy: (Math.random() - 0.5) * 1.5,
+        alpha: Math.random() * 0.5 + 0.4
+      };
+    }
+
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+      columns = Math.floor(width / 20) + 1;
+      drops = Array(columns).fill(1);
+      
+      auroraWaves = [
+        { yBase: height * 0.25, amplitude: 60, speed: 0.008, phase: 0, length: 0.002, color: '#00ffcc' },
+        { yBase: height * 0.45, amplitude: 85, speed: 0.005, phase: 1.5, length: 0.0012, color: '#00ff66' },
+        { yBase: height * 0.60, amplitude: 70, speed: 0.007, phase: 3.0, length: 0.0015, color: '#ff00ff' },
+        { yBase: height * 0.75, amplitude: 90, speed: 0.004, phase: 4.5, length: 0.001, color: '#9900ff' }
+      ];
+
+      shards = [];
+      for (let i = 0; i < 35; i++) {
+        const pts = [];
+        const numPts = 3 + Math.floor(Math.random() * 3);
+        const radius = 30 + Math.random() * 80;
+        for (let j = 0; j < numPts; j++) {
+          const angle = (j / numPts) * Math.PI * 2 + Math.random() * 0.5;
+          pts.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
+        }
+        shards.push({
+          x: Math.random() * width, y: Math.random() * height,
+          vx: (Math.random() - 0.5) * 0.6, vy: (Math.random() - 0.5) * 0.6,
+          pts, rot: Math.random() * Math.PI * 2, vRot: (Math.random() - 0.5) * 0.01,
+          hueOffset: Math.random() * 60
+        });
+      }
+    }
+
+    function draw() {
+      const mode = document.body.getAttribute('data-bg');
+      if (mode !== 'matrix') ctx.clearRect(0, 0, width, height);
+      
+      const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#00ff66';
+      const secondaryColor = getComputedStyle(document.documentElement).getPropertyValue('--secondary').trim() || '#00f0ff';
+
+      if (mode === 'matrix') {
+        ctx.fillStyle = 'rgba(2, 3, 5, 0.08)';
+        ctx.fillRect(0, 0, width, height);
+        ctx.fillStyle = primaryColor;
+        ctx.shadowColor = primaryColor;
+        ctx.shadowBlur = 12;
+        ctx.font = '700 14px monospace';
+        drops.forEach((y, i) => {
+          ctx.fillText(String.fromCharCode(0x30A0 + Math.random() * 96), i * 20, y * 20);
+          if (y * 20 > height && Math.random() > 0.98) drops[i] = 0;
+          drops[i]++;
+        });
+      } 
+      else if (mode === 'void') {
+        ctx.fillStyle = '#010204';
+        ctx.fillRect(0, 0, width, height);
+
+        // Continuous particle spawning
+        voidState.spawnTimer++;
+        if (voidState.spawnTimer % 4 === 0 && voidState.orbs.length < voidState.maxOrbs) {
+          voidState.orbs.push(createVoidOrb(width, height));
+        }
+
+        const pullRadius = Math.max(250, voidState.currentRadius * 5);
+
+        for (let i = voidState.orbs.length - 1; i >= 0; i--) {
+          const p = voidState.orbs[i];
+          
+          let dx = mousePos.x - p.x;
+          let dy = mousePos.y - p.y;
+          let dist = Math.hypot(dx, dy);
+
+          if (dist < pullRadius) {
+            let angle = Math.atan2(dy, dx);
+            let gravity = ((pullRadius - dist) / pullRadius) * 1.8;
+            
+            // Inward gravity pull combined with dynamic swirling vortex
+            p.vx += Math.cos(angle) * gravity + Math.cos(angle + Math.PI / 2) * gravity * 0.8;
+            p.vy += Math.sin(angle) * gravity + Math.sin(angle + Math.PI / 2) * gravity * 0.8;
+          }
+
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vx *= 0.95;
+          p.vy *= 0.95;
+
+          // Consumption logic: When absorbed by cursor black hole
+          if (dist < voidState.currentRadius / 2 + 5) {
+            voidState.cursorMass += 1;
+            voidState.orbs.splice(i, 1);
+            continue;
+          }
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fillStyle = primaryColor;
+          ctx.globalAlpha = p.alpha;
+          ctx.shadowColor = primaryColor;
+          ctx.shadowBlur = 8;
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Calculate and smoothly update cursor size based on consumed mass
+        const targetRadius = Math.min(voidState.maxRadius, voidState.baseRadius + Math.pow(voidState.cursorMass, 0.55) * 3);
+        voidState.currentRadius += (targetRadius - voidState.currentRadius) * 0.1;
+
+        // Sync DOM cursor sizes dynamically
+        if (!isTouch) {
+          const dotSize = voidState.currentRadius;
+          const ringSize = voidState.currentRadius * 2.2;
+          dot.style.width = `${dotSize}px`;
+          dot.style.height = `${dotSize}px`;
+          ring.style.width = `${ringSize}px`;
+          ring.style.height = `${ringSize}px`;
+        }
+
+        // Draw dynamic gravitational accretion glow behind the mouse cursor
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(mousePos.x, mousePos.y, voidState.currentRadius * 2, 0, Math.PI * 2);
+        ctx.fillStyle = secondaryColor;
+        ctx.globalAlpha = 0.15;
+        ctx.shadowColor = secondaryColor;
+        ctx.shadowBlur = 35;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(mousePos.x, mousePos.y, voidState.currentRadius * 1.2, 0, Math.PI * 2);
+        ctx.strokeStyle = primaryColor;
+        ctx.lineWidth = 2.5;
+        ctx.globalAlpha = 0.6;
+        ctx.shadowColor = primaryColor;
+        ctx.shadowBlur = 20;
+        ctx.stroke();
+        ctx.restore();
+      }
+      else if (mode === 'supernova') {
+        novaAngle += 0.005;
+        ctx.fillStyle = '#010204';
+        ctx.fillRect(0, 0, width, height);
+
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(novaAngle);
+
+        const rings = 6;
+        for (let i = 1; i <= rings; i++) {
+          ctx.beginPath();
+          const r = i * (Math.min(width, height) / (rings * 1.8));
+          ctx.arc(0, 0, r, 0, Math.PI * 2);
+          ctx.strokeStyle = i % 2 === 0 ? primaryColor : secondaryColor;
+          ctx.lineWidth = 1.5;
+          ctx.globalAlpha = 0.4;
+          ctx.shadowColor = ctx.strokeStyle;
+          ctx.shadowBlur = 20;
+          ctx.stroke();
+        }
+
+        const rays = 12;
+        for (let i = 0; i < rays; i++) {
+          const angle = (i / rays) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(angle) * width, Math.sin(angle) * width);
+          ctx.strokeStyle = primaryColor;
+          ctx.globalAlpha = 0.2;
+          ctx.lineWidth = 2;
+          ctx.shadowColor = primaryColor;
+          ctx.shadowBlur = 15;
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      }
+      else if (mode === 'aurora') {
+        ctx.fillStyle = '#020305';
+        ctx.fillRect(0, 0, width, height);
+        
+        auroraWaves.forEach((wave) => {
+          wave.phase += wave.speed;
+          ctx.save();
+          ctx.globalCompositeOperation = 'screen';
+          
+          let gradient = ctx.createLinearGradient(0, wave.yBase - 150, 0, wave.yBase + 250);
+          gradient.addColorStop(0, 'transparent');
+          gradient.addColorStop(0.4, wave.color);
+          gradient.addColorStop(1, 'transparent');
+          
+          ctx.fillStyle = gradient;
+          ctx.globalAlpha = 0.55;
+          
+          ctx.beginPath();
+          ctx.moveTo(0, height);
+          for (let x = 0; x <= width; x += 15) {
+            let y = wave.yBase + Math.sin(x * wave.length + wave.phase) * wave.amplitude 
+                             + Math.cos(x * 0.003 - wave.phase * 0.8) * (wave.amplitude * 0.5);
+            ctx.lineTo(x, y);
+          }
+          ctx.lineTo(width, height);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.strokeStyle = wave.color;
+          ctx.lineWidth = 3;
+          ctx.shadowColor = wave.color;
+          ctx.shadowBlur = 25;
+          ctx.stroke();
+          ctx.restore();
+        });
+      }
+      else if (mode === 'shattered') {
+        neonHue = (neonHue + 0.5) % 360;
+        
+        shards.forEach(s => {
+          s.x += s.vx; s.y += s.vy; s.rot += s.vRot;
+          if (s.x < -100) s.x = width + 100;
+          if (s.x > width + 100) s.x = -100;
+          if (s.y < -100) s.y = height + 100;
+          if (s.y > height + 100) s.y = -100;
+
+          ctx.save();
+          ctx.translate(s.x, s.y);
+          ctx.rotate(s.rot);
+
+          const currentHue = (neonHue + s.hueOffset) % 360;
+          const strokeColor = `hsl(${currentHue}, 100%, 65%)`;
+          const fillColor = `hsla(${currentHue}, 100%, 50%, 0.08)`;
+
+          ctx.beginPath();
+          ctx.moveTo(s.pts[0].x, s.pts[0].y);
+          for (let i = 1; i < s.pts.length; i++) ctx.lineTo(s.pts[i].x, s.pts[i].y);
+          ctx.closePath();
+
+          ctx.fillStyle = fillColor;
+          ctx.fill();
+          ctx.strokeStyle = strokeColor;
+          ctx.lineWidth = 2;
+          ctx.shadowColor = strokeColor;
+          ctx.shadowBlur = 20;
+          ctx.stroke();
+          ctx.restore();
+        });
+      }
+
+      // Reset cursor sizes when leaving Void mode
+      if (mode !== 'void' && !isTouch) {
+        dot.style.width = `16px`;
+        dot.style.height = `16px`;
+        ring.style.width = `38px`;
+        ring.style.height = `38px`;
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    function switchTab(view) {
+      document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active-view'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+      if(view === 'games') {
+        document.getElementById('gamesSection').classList.add('active-view');
+        document.getElementById('btnGames').classList.add('active');
+      } else if (view === 'events') {
+        document.getElementById('eventsSection').classList.add('active-view');
+        document.getElementById('btnEvents').classList.add('active');
+      }
+    }
+
+    function setBg(m) {
+      document.body.setAttribute('data-bg', m);
+      localStorage.setItem('nebula-bg', m);
+      document.querySelectorAll('.bg-btn').forEach(b => {
+        b.classList.toggle('active', b.id === `bg-${m}`);
+      });
+    }
+
+    function setTheme(t) {
+      if(t === 'default') {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.removeItem('nebula-theme');
+      } else {
+        document.documentElement.setAttribute('data-theme', t);
+        localStorage.setItem('nebula-theme', t);
+      }
+    }
+
+    window.addEventListener('resize', resize);
+    window.addEventListener('DOMContentLoaded', () => {
+      resize();
+      renderGames(games);
+      
+      const savedBg = localStorage.getItem('nebula-bg') || 'neon';
+      const savedTheme = localStorage.getItem('nebula-theme');
+      
+      setBg(savedBg);
+      if (savedTheme) setTheme(savedTheme);
+
+      requestAnimationFrame(draw);
+
+      setTimeout(() => {
+        const splash = document.getElementById('splashOverlay');
+        const main = document.getElementById('mainAppContent');
+        splash.style.opacity = '0';
+        splash.style.visibility = 'hidden';
+        main.style.opacity = '1';
+      }, 4800);
+    });
+  </script>
+</body>
+</html>
+
+

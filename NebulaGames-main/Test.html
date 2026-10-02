@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Star Dodger</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      align-items: center;
+      background: radial-gradient(circle at top, #243b67, #090d1c 70%);
+      color: #f5f7ff;
+      display: flex;
+      font-family: system-ui, sans-serif;
+      justify-content: center;
+      margin: 0;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .game { max-width: 680px; text-align: center; width: 100%; }
+    h1 { font-size: clamp(2rem, 7vw, 3.5rem); margin: 0 0 6px; }
+    p { color: #aeb9dc; margin: 0 0 16px; }
+    .hud { display: flex; justify-content: space-between; margin: 0 auto 10px; max-width: 600px; }
+    .stat { background: #151d38cc; border: 1px solid #3a4a7a; border-radius: 10px; padding: 8px 16px; }
+    canvas {
+      background: #070b19;
+      border: 2px solid #5d75c7;
+      border-radius: 14px;
+      box-shadow: 0 0 35px #1c54a866;
+      display: block;
+      height: auto;
+      margin: auto;
+      max-width: 100%;
+      touch-action: none;
+    }
+    button {
+      background: #6d5dfc; border: 0; border-radius: 9px; color: white;
+      cursor: pointer; font-size: 1rem; font-weight: 700; margin-top: 14px;
+      padding: 11px 24px;
+    }
+    button:hover { background: #8174ff; }
+    .hint { font-size: .9rem; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <h1>⭐ Star Dodger</h1>
+    <p>Move your ship, collect stars, and dodge the falling asteroids.</p>
+    <div class="hud">
+      <div class="stat">Score: <strong id="score">0</strong></div>
+      <div class="stat">Best: <strong id="best">0</strong></div>
+    </div>
+    <canvas id="game" width="600" height="400" aria-label="Star Dodger game"></canvas>
+    <button id="start">Start game</button>
+    <p class="hint">Use ← → or A/D to move. On mobile, drag your ship.</p>
+  </main>
+  <script>
+    const canvas = document.querySelector("#game");
+    const ctx = canvas.getContext("2d");
+    const scoreText = document.querySelector("#score");
+    const bestText = document.querySelector("#best");
+    const startButton = document.querySelector("#start");
+    const keys = {};
+    let player, objects, score, running, lastTime, spawnTimer, animation;
+    let best = Number(localStorage.getItem("star-dodger-best") || 0);
+    bestText.textContent = best;
+
+    function reset() {
+      player = { x: canvas.width / 2 - 18, y: canvas.height - 48, width: 36, height: 24, speed: 330 };
+      objects = [];
+      score = 0;
+      spawnTimer = 0;
+      scoreText.textContent = score;
+    }
+    function start() {
+      cancelAnimationFrame(animation);
+      reset();
+      running = true;
+      startButton.textContent = "Restart game";
+      lastTime = performance.now();
+      animation = requestAnimationFrame(loop);
+    }
+    function endGame() {
+      running = false;
+      if (score > best) {
+        best = score;
+        bestText.textContent = best;
+        localStorage.setItem("star-dodger-best", best);
+      }
+      startButton.textContent = "Play again";
+      draw();
+      ctx.fillStyle = "#000b";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 34px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("Game over!", canvas.width / 2, canvas.height / 2 - 12);
+      ctx.font = "18px system-ui";
+      ctx.fillText(`Score: ${score} — click Play again`, canvas.width / 2, canvas.height / 2 + 25);
+    }
+    function addObject() {
+      const star = Math.random() < .28;
+      objects.push({
+        x: 12 + Math.random() * (canvas.width - 24),
+        y: -20, size: star ? 9 : 15 + Math.random() * 8,
+        speed: 110 + Math.random() * 90 + score * 2, type: star ? "star" : "rock"
+      });
+    }
+    function overlaps(a, b) {
+      return b.x + b.size > a.x && b.x - b.size < a.x + a.width &&
+        b.y + b.size > a.y && b.y - b.size < a.y + a.height;
+    }
+    function update(delta) {
+      if (keys.ArrowLeft || keys.a) player.x -= player.speed * delta;
+      if (keys.ArrowRight || keys.d) player.x += player.speed * delta;
+      player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+      spawnTimer += delta;
+      if (spawnTimer > Math.max(.28, .7 - score * .006)) { spawnTimer = 0; addObject(); }
+      for (const object of objects) {
+        object.y += object.speed * delta;
+        if (overlaps(player, object)) {
+          if (object.type === "star") { score += 10; object.y = canvas.height + 100; }
+          else { endGame(); return; }
+        }
+      }
+      objects = objects.filter(object => object.y < canvas.height + 30);
+      score += delta * 2;
+      scoreText.textContent = Math.floor(score);
+    }
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#101a38";
+      for (let i = 0; i < 45; i++) {
+        const x = (i * 97) % canvas.width, y = (i * 53 + (running ? performance.now() / 30 : 0)) % canvas.height;
+        ctx.fillRect(x, y, 2, 2);
+      }
+      for (const object of objects) {
+        ctx.fillStyle = object.type === "star" ? "#ffe66d" : "#ec6a77";
+        ctx.beginPath();
+        ctx.arc(object.x, object.y, object.size, 0, Math.PI * 2);
+        ctx.fill();
+        if (object.type === "star") { ctx.fillStyle = "#fff7b0"; ctx.fillRect(object.x - 2, object.y - 2, 4, 4); }
+      }
+      ctx.fillStyle = "#6dcbff";
+      ctx.beginPath();
+      ctx.moveTo(player.x + player.width / 2, player.y);
+      ctx.lineTo(player.x + player.width, player.y + player.height);
+      ctx.lineTo(player.x, player.y + player.height);
+      ctx.closePath();
+      ctx.fill();
+    }
+    function loop(time) {
+      const delta = Math.min((time - lastTime) / 1000, .05);
+      lastTime = time;
+      if (!running) return;
+      update(delta);
+      draw();
+      if (running) animation = requestAnimationFrame(loop);
+    }
+    window.addEventListener("keydown", event => { keys[event.key] = true; });
+    window.addEventListener("keyup", event => { keys[event.key] = false; });
+    canvas.addEventListener("pointermove", event => {
+      if (!running) return;
+      const rect = canvas.getBoundingClientRect();
+      player.x = (event.clientX - rect.left) * canvas.width / rect.width - player.width / 2;
+    });
+    startButton.addEventListener("click", start);
+    reset();
+    draw();
+  </script>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NEON_GOLF | Gravity Wells</title>
+    <style>
+        body { background: #000; color: #0f0; font-family: 'Courier New', monospace; margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+        canvas { border: 2px solid #004400; background: #050505; cursor: crosshair; box-shadow: 0 0 20px #002200; }
+        #ui { margin-bottom: 10px; text-align: center; }
+        .hint { color: #444; font-size: 0.8rem; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <h1>NEON_GOLF</h1>
+        <div>STAGES_CLEARED: <span id="score">0</span></div>
+        <div class="hint">CLICK AND DRAG BALL TO AIM | AVOID THE RED GRAVITY WELL</div>
+    </div>
+    <canvas id="game" width="800" height="500"></canvas>
+
+<script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+
+    let ball = { x: 100, y: 250, vx: 0, vy: 0, radius: 10, dragging: false };
+    let goal = { x: 700, y: 250, radius: 25 };
+    let bot = { x: 400, y: 250, radius: 40, pull: 0.5 }; // The "Gravity Bot"
+    let score = 0, mouse = { x: 0, y: 0 };
+
+    function resetLevel() {
+        ball.x = 80;
+        ball.y = 100 + Math.random() * 300;
+        ball.vx = 0; ball.vy = 0;
+        
+        goal.x = 600 + Math.random() * 150;
+        goal.y = 100 + Math.random() * 300;
+        
+        bot.x = 300 + Math.random() * 200;
+        bot.y = 100 + Math.random() * 300;
+    }
+
+    canvas.onmousedown = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        let mx = e.clientX - rect.left;
+        let my = e.clientY - rect.top;
+        if (Math.hypot(mx - ball.x, my - ball.y) < 20) ball.dragging = true;
+    };
+
+    canvas.onmousemove = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = e.clientX - rect.left;
+        mouse.y = e.clientY - rect.top;
+    };
+
+    canvas.onmouseup = () => {
+        if (ball.dragging) {
+            ball.vx = (ball.x - mouse.x) * 0.12;
+            ball.vy = (ball.y - mouse.y) * 0.12;
+            ball.dragging = false;
+        }
+    };
+
+    function update() {
+        if (!ball.dragging) {
+            // Apply Bot Gravity
+            let dx = bot.x - ball.x;
+            let dy = bot.y - ball.y;
+            let dist = Math.hypot(dx, dy);
+            
+            if (dist < 300) {
+                let force = (300 - dist) / 300 * bot.pull;
+                ball.vx += (dx / dist) * force;
+                ball.vy += (dy / dist) * force;
+            }
+
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+            ball.vx *= 0.99; // Air friction
+            ball.vy *= 0.99;
+
+            // Collision with Bot (Lose)
+            if (dist < bot.radius) resetLevel();
+
+            // Collision with Goal (Win)
+            if (Math.hypot(ball.x - goal.x, ball.y - goal.y) < goal.radius) {
+                score++;
+                scoreEl.innerText = score;
+                resetLevel();
+            }
+
+            // Bounce off walls
+            if (ball.x < 0 || ball.x > canvas.width) ball.vx *= -1;
+            if (ball.y < 0 || ball.y > canvas.height) ball.vy *= -1;
+        }
+    }
+
+    function draw() {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Goal
+        ctx.strokeStyle = '#0f0';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(goal.x, goal.y, goal.radius, 0, Math.PI*2); ctx.stroke();
+        ctx.shadowBlur = 15; ctx.shadowColor = '#0f0';
+        ctx.stroke();
+
+        // Draw Gravity Bot
+        ctx.fillStyle = '#200';
+        ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.radius, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#f00';
+        ctx.stroke();
+        
+        // Draw Aim Line
+        if (ball.dragging) {
+            ctx.strokeStyle = '#555';
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath(); ctx.moveTo(ball.x, ball.y); ctx.lineTo(mouse.x, mouse.y); ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Draw Ball
+        ctx.fillStyle = '#fff';
+        ctx.shadowColor = '#fff';
+        ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI*2); ctx.fill();
+        
+        ctx.shadowBlur = 0;
+        update();
+        requestAnimationFrame(draw);
+    }
+
+    resetLevel();
+    draw();
+</script>
+</body>
+</html>

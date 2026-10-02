@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Elemental Tactics</title>
+  <style>
+    :root {
+      --bg: #1e1e2e;
+      --card-bg: #2b2b3d;
+      --text: #cdd6f4;
+      --accent-p1: #89b4fa;
+      --accent-p2: #f38ba8;
+      --border: #45475a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+    #game-container { width: 100%; max-width: 600px; background: var(--card-bg); border-radius: 12px; padding: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); border: 1px solid var(--border); }
+    
+    .screen { display: none; text-align: center; }
+    .screen.active { display: block; }
+    
+    h1 { margin-bottom: 8px; font-size: 2rem; color: #fff; }
+    p { margin-bottom: 20px; color: #a6adc8; }
+
+    .btn-group { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+    button { background: #313244; color: #fff; border: 2px solid var(--border); padding: 14px 20px; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    button:hover { background: #45475a; border-color: #585b70; transform: translateY(-2px); }
+    button:active { transform: translateY(0); }
+
+    .arena { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    .fighter-card { background: #181825; padding: 16px; border-radius: 8px; border: 2px solid var(--border); }
+    .fighter-card.p1 { border-color: var(--accent-p1); }
+    .fighter-card.p2 { border-color: var(--accent-p2); }
+    .fighter-name { font-weight: bold; font-size: 1.1rem; margin-bottom: 6px; }
+    .fighter-emoji { font-size: 3rem; margin: 10px 0; }
+    
+    .hp-bar-bg { background: #313244; height: 16px; border-radius: 8px; overflow: hidden; margin-top: 8px; }
+    .hp-bar-fill { background: #a6e3a1; height: 100%; width: 100%; transition: width 0.3s; }
+
+    .log { background: #181825; border: 1px solid var(--border); height: 100px; border-radius: 8px; padding: 10px; overflow-y: auto; font-size: 0.9rem; text-align: left; margin-bottom: 20px; }
+    .log-entry { margin-bottom: 4px; }
+    
+    .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .turn-indicator { font-weight: bold; margin-bottom: 12px; font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+
+<div id="game-container">
+  <!-- Mode Selection Screen -->
+  <div id="mode-screen" class="screen active">
+    <h1>Elemental Tactics</h1>
+    <p>Select your game mode to begin</p>
+    <div class="btn-group">
+      <button onclick="selectMode('1p')">🎮 1 Player (Vs. AI)</button>
+      <button onclick="selectMode('2p')">👥 2 Players (Pass & Play)</button>
+    </div>
+  </div>
+
+  <!-- Character Selection Screen -->
+  <div id="select-screen" class="screen">
+    <h1 id="select-title">Player 1: Select Fighter</h1>
+    <p>Choose your element:</p>
+    <div class="btn-group">
+      <button onclick="pickFighter('Fire')">🔥 Fire Dragon (High Atk, Low HP)</button>
+      <button onclick="pickFighter('Water')">💧 Water Golem (Balanced, Shield)</button>
+      <button onclick="pickFighter('Grass')">🌿 Forest Sprite (Heals, Steady Atk)</button>
+    </div>
+  </div>
+
+  <!-- Battle Screen -->
+  <div id="battle-screen" class="screen">
+    <div class="turn-indicator" id="turn-text">Player 1's Turn</div>
+    <div class="arena">
+      <div class="fighter-card p1">
+        <div class="fighter-name" id="p1-name">Player 1</div>
+        <div class="fighter-emoji" id="p1-emoji">🔥</div>
+        <div>HP: <span id="p1-hp-text">100/100</span></div>
+        <div class="hp-bar-bg"><div id="p1-hp-bar" class="hp-bar-fill"></div></div>
+      </div>
+      <div class="fighter-card p2">
+        <div class="fighter-name" id="p2-name">Player 2</div>
+        <div class="fighter-emoji" id="p2-emoji">💧</div>
+        <div>HP: <span id="p2-hp-text">100/100</span></div>
+        <div class="hp-bar-bg"><div id="p2-hp-bar" class="hp-bar-fill"></div></div>
+      </div>
+    </div>
+    
+    <div class="log" id="game-log"></div>
+
+    <div class="controls" id="action-controls">
+      <button onclick="executeAction('attack')">⚔️ Strike</button>
+      <button onclick="executeAction('skill')">✨ Special Ability</button>
+    </div>
+  </div>
+
+  <!-- Game Over Screen -->
+  <div id="end-screen" class="screen">
+    <h1 id="winner-title">Victory!</h1>
+    <p id="winner-text"></p>
+    <button onclick="resetGame()">Play Again</button>
+  </div>
+</div>
+
+<script>
+  const SPECIES = {
+    Fire:  { emoji: '🔥', maxHp: 90,  atkMin: 18, atkMax: 26, skillName: 'Inferno (28-36 Dmg)' },
+    Water: { emoji: '💧', maxHp: 110, atkMin: 12, atkMax: 18, skillName: 'Barrier (+15 HP & Block)' },
+    Grass: { emoji: '🌿', maxHp: 100, atkMin: 14, atkMax: 20, skillName: 'Photosynthesis (+20 HP)' }
+  };
+
+  let isSinglePlayer = true;
+  let activePlayer = 1; // 1 or 2
+  let p1Data = {}, p2Data = {};
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function selectMode(mode) {
+    isSinglePlayer = (mode === '1p');
+    activePlayer = 1;
+    document.getElementById('select-title').innerText = "Player 1: Select Fighter";
+    showScreen('select-screen');
+  }
+
+  function pickFighter(type) {
+    if (activePlayer === 1) {
+      p1Data = createFighter("Player 1", type);
+      if (isSinglePlayer) {
+        // AI random choice
+        const keys = Object.keys(SPECIES);
+        const aiType = keys[Math.floor(Math.random() * keys.length)];
+        p2Data = createFighter("CPU", aiType);
+        initBattle();
+      } else {
+        activePlayer = 2;
+        document.getElementById('select-title').innerText = "Player 2: Select Fighter";
+      }
+    } else {
+      p2Data = createFighter("Player 2", type);
+      initBattle();
+    }
+  }
+
+  function createFighter(name, type) {
+    const spec = SPECIES[type];
+    return {
+      name,
+      type,
+      emoji: spec.emoji,
+      maxHp: spec.maxHp,
+      hp: spec.maxHp,
+      atkMin: spec.atkMin,
+      atkMax: spec.atkMax,
+      skillName: spec.skillName,
+      shield: 0
+    };
+  }
+
+  function initBattle() {
+    activePlayer = 1;
+    document.getElementById('p1-name').innerText = p1Data.name;
+    document.getElementById('p1-emoji').innerText = p1Data.emoji;
+    document.getElementById('p2-name').innerText = p2Data.name;
+    document.getElementById('p2-emoji').innerText = p2Data.emoji;
+    
+    document.getElementById('game-log').innerHTML = '';
+    logMsg("The battle begins!");
+
+    updateUI();
+    showScreen('battle-screen');
+  }
+
+  function logMsg(msg) {
+    const log = document.getElementById('game-log');
+    log.innerHTML += `<div class="log-entry">${msg}</div>`;
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function updateUI() {
+    // Player 1 UI
+    document.getElementById('p1-hp-text').innerText = `${p1Data.hp}/${p1Data.maxHp}`;
+    document.getElementById('p1-hp-bar').style.width = `${Math.max(0, (p1Data.hp / p1Data.maxHp) * 100)}%`;
+    
+    // Player 2 UI
+    document.getElementById('p2-hp-text').innerText = `${p2Data.hp}/${p2Data.maxHp}`;
+    document.getElementById('p2-hp-bar').style.width = `${Math.max(0, (p2Data.hp / p2Data.maxHp) * 100)}%`;
+
+    // Turn indicator & controls
+    const turnText = document.getElementById('turn-text');
+    const controls = document.getElementById('action-controls');
+
+    if (activePlayer === 1) {
+      turnText.innerText = `${p1Data.name}'s Turn`;
+      turnText.style.color = "var(--accent-p1)";
+      controls.style.pointerEvents = "auto";
+      controls.style.opacity = "1";
+    } else {
+      turnText.innerText = `${p2Data.name}'s Turn`;
+      turnText.style.color = "var(--accent-p2)";
+      if (isSinglePlayer) {
+        controls.style.pointerEvents = "none";
+        controls.style.opacity = "0.5";
+      } else {
+        controls.style.pointerEvents = "auto";
+        controls.style.opacity = "1";
+      }
+    }
+  }
+
+  function executeAction(actType) {
+    const attacker = activePlayer === 1 ? p1Data : p2Data;
+    const defender = activePlayer === 1 ? p2Data : p1Data;
+
+    performMove(attacker, defender, actType);
+
+    if (checkMatchEnd()) return;
+
+    // Switch turns
+    activePlayer = activePlayer === 1 ? 2 : 1;
+    updateUI();
+
+    if (isSinglePlayer && activePlayer === 2) {
+      setTimeout(cpuTurn, 1000);
+    }
+  }
+
+  function performMove(attacker, defender, actType) {
+    if (actType === 'attack') {
+      let dmg = rand(attacker.atkMin, attacker.atkMax);
+      dmg = applyShield(defender, dmg);
+      defender.hp = Math.max(0, defender.hp - dmg);
+      logMsg(`⚔️ <b>${attacker.name}</b> strikes <b>${defender.name}</b> for ${dmg} dmg!`);
+    } else {
+      // Special Skills
+      if (attacker.type === 'Fire') {
+        let dmg = rand(28, 36);
+        dmg = applyShield(defender, dmg);
+        defender.hp = Math.max(0, defender.hp - dmg);
+        logMsg(`🔥 <b>${attacker.name}</b> casts Inferno on <b>${defender.name}</b> for ${dmg} dmg!`);
+      } else if (attacker.type === 'Water') {
+        attacker.hp = Math.min(attacker.maxHp, attacker.hp + 15);
+        attacker.shield = 10;
+        logMsg(`💧 <b>${attacker.name}</b> raises a Barrier! (+15 HP, 10 Block)`);
+      } else if (attacker.type === 'Grass') {
+        attacker.hp = Math.min(attacker.maxHp, attacker.hp + 20);
+        logMsg(`🌿 <b>${attacker.name}</b> uses Photosynthesis! (+20 HP)`);
+      }
+    }
+  }
+
+  function applyShield(defender, dmg) {
+    if (defender.shield > 0) {
+      let blocked = Math.min(defender.shield, dmg);
+      defender.shield -= blocked;
+      dmg -= blocked;
+      logMsg(`🛡️ <b>${defender.name}</b>'s shield absorbed ${blocked} damage!`);
+    }
+    return dmg;
+  }
+
+  function cpuTurn() {
+    // AI Decision: 65% strike, 35% special skill
+    const choice = Math.random() < 0.65 ? 'attack' : 'skill';
+    performMove(p2Data, p1Data, choice);
+
+    if (checkMatchEnd()) return;
+
+    activePlayer = 1;
+    updateUI();
+  }
+
+  function checkMatchEnd() {
+    if (p1Data.hp <= 0 || p2Data.hp <= 0) {
+      let winner = p1Data.hp > 0 ? p1Data.name : p2Data.name;
+      document.getElementById('winner-title').innerText = `${winner} Wins!`;
+      document.getElementById('winner-text').innerText = `${p1Data.hp <= 0 ? p1Data.name : p2Data.name} was defeated.`;
+      showScreen('end-screen');
+      return true;
+    }
+    return false;
+  }
+
+  function rand(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  function resetGame() {
+    showScreen('mode-screen');
+  }
+</script>
+</body>
+</html>

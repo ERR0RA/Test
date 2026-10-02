@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CHEMISTRY REVISION PRO | iPad Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&family=Fira+Code:wght@500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00d9ff;
+            --bg: #05070a;
+            --card: #11141d;
+            --text: #ffffff;
+            --correct: #00ff88;
+            --wrong: #ff3b3b;
+            --metal: #fbc531;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            -webkit-user-select: none;
+        }
+
+        header {
+            background: linear-gradient(135deg, #002b36 0%, #001a1f 100%);
+            padding: 40px 20px;
+            text-align: center;
+            border-bottom: 3px solid var(--primary);
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(0, 217, 255, 0.1);
+            padding: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(15px);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .container {
+            padding: 20px;
+            max-width: 900px;
+            margin: auto;
+        }
+
+        .game-card {
+            background: var(--card);
+            border-radius: 24px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.05);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+        }
+
+        .question-display {
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 25px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 18px;
+            padding: 20px;
+            border: 1px solid rgba(0, 217, 255, 0.3);
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        @media (max-width: 600px) { .options-grid { grid-template-columns: 1fr; } }
+
+        .btn-tap {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid rgba(255,255,255,0.1);
+            color: white;
+            padding: 20px;
+            border-radius: 16px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            min-height: 75px; /* iPad Finger Size Optimized */
+        }
+
+        .btn-tap:active {
+            background: var(--primary);
+            color: #000;
+            transform: scale(0.96);
+        }
+
+        /* DATA BANK SECTION */
+        .revision-sheet {
+            background: #fff;
+            color: #111;
+            border-radius: 30px;
+            padding: 35px;
+            margin-top: 40px;
+        }
+
+        .revision-sheet h2 { color: #0056b3; border-left: 5px solid #00d9ff; padding-left: 15px; }
+
+        .tag {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+            background: var(--primary);
+            color: black;
+        }
+
+        .feedback-pop {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 4rem;
+            font-weight: 900;
+            z-index: 1000;
+            pointer-events: none;
+            display: none;
+            text-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1 style="margin:0; font-size: 2.2rem; letter-spacing: -1px;">GCSE CHEMISTRY HUB</h1>
+    <p style="opacity: 0.7; font-weight: 500;">Atomic Structure | Reactions | Periodic Table</p>
+</header>
+
+<div class="stats-bar">
+    <div>XP: <span id="xp" style="color:var(--primary); font-weight:900;">0</span></div>
+    <div>STREAK: <span id="streak" style="color:var(--correct); font-weight:900;">0</span></div>
+</div>
+
+<div class="container">
+    
+    <div class="game-card">
+        <span class="tag">TOPIC 1 & 2: THE CORE</span>
+        <div id="q-text" class="question-display">Loading Atomic Data...</div>
+        <div id="options" class="options-grid"></div>
+    </div>
+
+    <div class="game-card" style="border-color: var(--metal);">
+        <span class="tag" style="background:var(--metal)">TOPIC 3: METAL REACTIVITY</span>
+        <div style="text-align: center; margin-bottom: 15px;">Identify the <b>General Equation</b>:</div>
+        <div id="sorter-q" class="question-display" style="font-size: 1.8rem; color: var(--metal);">Metal + Acid</div>
+        <div class="options-grid">
+            <button class="btn-tap" onclick="checkSort('Salt + Hydrogen')">Salt + Hydrogen</button>
+            <button class="btn-tap" onclick="checkSort('Salt + Water')">Salt + Water</button>
+            <button class="btn-tap" onclick="checkSort('Metal Oxide')">Metal Oxide</button>
+            <button class="btn-tap" onclick="checkSort('Hydroxide + H2')">Hydroxide + H2</button>
+        </div>
+    </div>
+
+    <div id="feedback" class="feedback-pop"></div>
+
+    <div class="revision-sheet">
+        <h2>📖 Full Revision Summary</h2>
+        <p><b>Conservation of Mass:</b> Total mass of reactants = Total mass of products. Atoms cannot be created or destroyed[cite: 789, 790].</p>
+        
+        <h3>Atomic Table</h3>
+        <table style="width:100%; border-collapse: collapse;">
+            <tr style="background:#f0f0f0"><th style="padding:10px">Particle</th><th>Charge</th><th>Mass</th></tr>
+            <tr><td style="padding:10px">Proton</td><td>+1</td><td>1</td></tr>
+            <tr><td style="padding:10px">Neutron</td><td>0</td><td>1</td></tr>
+            <tr><td style="padding:10px">Electron</td><td>-1</td><td>Tiny</td></tr>
+        </table>
+
+        <h3>Periodic Trends</h3>
+        <ul>
+            <li><b>Group 1:</b> Reactivity <b>increases</b> down the group (Outer electron lost easier due to shielding)[cite: 968, 970].</li>
+            <li><b>Group 7:</b> Reactivity <b>decreases</b> down the group (Harder to gain electron)[cite: 975, 979].</li>
+            <li><b>Group 0:</b> Stable because outer shell is already full[cite: 981, 984].</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+    // DATA LOADED FROM BOOKLET
+    const CHEM_DATA = [
+        { q: "Is 'Melting Ice' a physical or chemical change?", a: "Physical", o: ["Physical", "Chemical", "Nuclear", "None"] },
+        { q: "Why must symbol equations be balanced?", a: "Atoms aren't created/destroyed", o: ["Atoms aren't created/destroyed", "To look better", "To show energy", "To speed it up"] },
+        { q: "What reaction transfers energy TO surroundings?", a: "Exothermic", o: ["Exothermic", "Endothermic", "Reduction", "Thermal"] },
+        { q: "What gas turns limewater cloudy?", a: "Carbon Dioxide", o: ["Carbon Dioxide", "Hydrogen", "Oxygen", "Nitrogen"] },
+        { q: "What is the mass of a Neutron?", a: "1", o: ["1", "0", "-1", "Very small"] },
+        { q: "How many electrons fit in the 1st shell?", a: "2", o: ["2", "8", "18", "Unlimited"] },
+        { q: "Atoms with same Protons but different Neutrons are...", a: "Isotopes", o: ["Isotopes", "Ions", "Allotropes", "Alloys"] },
+        { q: "Mendeleev left gaps in his table to...", a: "Predict new elements", o: ["Predict new elements", "Save space", "Confuse people", "Hide mistakes"] },
+        { q: "Which alloy is made of Iron + Carbon?", a: "Steel", o: ["Steel", "Brass", "Bronze", "Stainless Steel"] },
+        { q: "A catalyst speeds up a reaction by...", a: "Lowering activation energy", o: ["Lowering activation energy", "Increasing heat", "Being used up", "Adding mass"] }
+    ];
+
+    const SORT_DATA = [
+        { q: "Metal + Acid", a: "Salt + Hydrogen" },
+        { q: "Acid + Alkali", a: "Salt + Water" },
+        { q: "Metal + Water", a: "Hydroxide + H2" },
+        { q: "Hydrocarbon + O2", a: "CO2 + Water" }
+    ];
+
+    let xp = 0;
+    let streak = 0;
+
+    function showFeedback(text, color) {
+        const f = document.getElementById('feedback');
+        f.innerText = text;
+        f.style.color = color;
+        f.style.display = 'block';
+        setTimeout(() => f.style.display = 'none', 700);
+    }
+
+    // MAIN GAME
+    function loadQuestion() {
+        const q = CHEM_DATA[Math.floor(Math.random() * CHEM_DATA.length)];
+        document.getElementById('q-text').innerText = q.q;
+        const optDiv = document.getElementById('options');
+        optDiv.innerHTML = '';
+        
+        [...q.o].sort(() => Math.random() - 0.5).forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'btn-tap';
+            btn.innerText = opt;
+            btn.onclick = () => {
+                if(opt === q.a) {
+                    xp += 100;
+                    streak++;
+                    showFeedback("CORRECT!", "var(--correct)");
+                } else {
+                    streak = 0;
+                    showFeedback("WRONG", "var(--wrong)");
+                }
+                updateUI();
+                loadQuestion();
+            };
+            optDiv.appendChild(btn);
+        });
+    }
+
+    // SORTER GAME
+    let activeSort = {};
+    function loadSort() {
+        activeSort = SORT_DATA[Math.floor(Math.random() * SORT_DATA.length)];
+        document.getElementById('sorter-q').innerText = activeSort.q;
+    }
+
+    function checkSort(val) {
+        if(val === activeSort.a) {
+            xp += 150;
+            streak++;
+            showFeedback("PERFECT!", "var(--correct)");
+        } else {
+            streak = 0;
+            showFeedback("FAIL", "var(--wrong)");
+        }
+        updateUI();
+        loadSort();
+    }
+
+    function updateUI() {
+        document.getElementById('xp').innerText = xp;
+        document.getElementById('streak').innerText = streak;
+        localStorage.setItem('chem_xp', xp);
+    }
+
+    window.onload = () => {
+        xp = parseInt(localStorage.getItem('chem_xp')) || 0;
+        updateUI();
+        loadQuestion();
+        loadSort();
+    };
+</script>
+
+</body>
+</html>

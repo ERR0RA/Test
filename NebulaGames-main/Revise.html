@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Revision Master 2026</title>
+    <style>
+        :root {
+            --primary: #2d3436; --secondary: #0984e3; --success: #00b894;
+            --danger: #d63031; --light: #dfe6e9; --hint: #6c5ce7; --dark: #1e272e;
+        }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #b2bec3; color: var(--primary); margin: 0;
+            display: flex; justify-content: center; align-items: center; min-height: 100vh;
+        }
+        #game-container {
+            background: white; width: 95%; max-width: 850px; padding: 30px;
+            border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); text-align: center;
+            position: relative;
+        }
+        .hidden { display: none !important; }
+        .menu-section {
+            margin: 15px 0; padding: 20px; border: 2px solid #eee;
+            border-radius: 10px; text-align: left; background: #fdfdfd;
+        }
+        .topic-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px; margin-top: 10px; font-size: 0.95rem;
+        }
+        .btn {
+            padding: 14px 22px; border: none; border-radius: 8px;
+            cursor: pointer; font-weight: bold; transition: 0.3s; margin: 5px;
+        }
+        .btn-start { background: var(--secondary); color: white; width: 100%; font-size: 1.2rem; }
+        .btn-submit { background: var(--success); color: white; }
+        .btn-hint { background: var(--hint); color: white; }
+        .btn-next { background: var(--primary); color: white; }
+        .btn-tool { background: var(--dark); color: white; padding: 10px 15px; font-size: 0.9rem; }
+        
+        #question-box {
+            font-size: 1.2rem; margin: 25px 0; padding: 35px;
+            background: #f1f2f6; border-radius: 15px; position: relative;
+            border-left: 8px solid var(--secondary); line-height: 1.6; text-align: left;
+        }
+        .calc-badge {
+            position: absolute; top: 15px; right: 15px; padding: 5px 12px;
+            border-radius: 5px; font-size: 0.75rem; font-weight: 900;
+        }
+        .calc-yes { background: #ffeaa7; color: #d63031; border: 1px solid #fab1a0; }
+        .calc-no { background: #dff9fb; color: #00cec9; border: 1px solid #81ecec; }
+        
+        #answer-input {
+            padding: 15px; font-size: 1.3rem; width: 85%;
+            border: 2px solid #ced4da; border-radius: 8px; margin-bottom: 20px;
+        }
+        
+        /* Calculator Styles */
+        #calculator {
+            position: absolute; top: 20px; right: 20px; background: #2d3436;
+            padding: 15px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            width: 220px; display: none; z-index: 100;
+        }
+        #calc-display {
+            width: 100%; height: 40px; background: #dfe6e9; border-radius: 5px;
+            margin-bottom: 10px; text-align: right; padding: 5px 10px;
+            font-size: 1.2rem; box-sizing: border-box; border: none; font-family: monospace;
+        }
+        .calc-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px;
+        }
+        .calc-btn {
+            background: #636e72; color: white; border: none; padding: 12px;
+            border-radius: 5px; cursor: pointer; font-size: 1.1rem; font-weight: bold;
+        }
+        .calc-btn:hover { background: #b2bec3; color: #2d3436; }
+        .calc-op { background: #0984e3; }
+        .calc-eq { background: #00b894; grid-column: span 2; }
+        .calc-clear { background: #d63031; grid-column: span 1; }
+        
+        .top-tools { display: flex; justify-content: space-between; margin-bottom: -10px; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    
+    <div id="calculator">
+        <input type="text" id="calc-display" disabled>
+        <div class="calc-grid">
+            <button class="calc-btn calc-clear" onclick="calcInput('C')">C</button>
+            <button class="calc-btn calc-op" onclick="calcInput('PI')">π</button>
+            <button class="calc-btn calc-clear" style="grid-column: span 2;" onclick="toggleCalc()">Close</button>
+            
+            <button class="calc-btn" onclick="calcInput('7')">7</button>
+            <button class="calc-btn" onclick="calcInput('8')">8</button>
+            <button class="calc-btn" onclick="calcInput('9')">9</button>
+            <button class="calc-btn calc-op" onclick="calcInput('/')">÷</button>
+            
+            <button class="calc-btn" onclick="calcInput('4')">4</button>
+            <button class="calc-btn" onclick="calcInput('5')">5</button>
+            <button class="calc-btn" onclick="calcInput('6')">6</button>
+            <button class="calc-btn calc-op" onclick="calcInput('*')">×</button>
+            
+            <button class="calc-btn" onclick="calcInput('1')">1</button>
+            <button class="calc-btn" onclick="calcInput('2')">2</button>
+            <button class="calc-btn" onclick="calcInput('3')">3</button>
+            <button class="calc-btn calc-op" onclick="calcInput('-')">-</button>
+            
+            <button class="calc-btn" onclick="calcInput('0')">0</button>
+            <button class="calc-btn" onclick="calcInput('.')">.</button>
+            <button class="calc-btn calc-eq" onclick="calcInput('=')">=</button>
+            <button class="calc-btn calc-op" onclick="calcInput('+')">+</button>
+        </div>
+    </div>
+
+    <div id="setup-screen">
+        <h1 style="margin:0;">Revision 2026</h1>
+        <p>Complete topic coverage with smart answer parsing.</p>
+        
+        <div class="menu-section">
+            <div style="display:flex; justify-content: space-between; align-items: center;">
+                <h3>Focus Topics</h3>
+                <button onclick="toggleAll(true)" style="font-size:0.7rem; cursor:pointer;">Select All</button>
+            </div>
+            <div class="topic-grid" id="topic-list"></div>
+        </div>
+
+        <div class="menu-section" style="text-align: center;">
+            <h3>Difficulty</h3>
+            <label><input type="radio" name="diff" value="easy"> Foundation</label> &nbsp;&nbsp;
+            <label><input type="radio" name="diff" value="medium" checked> Intermediate</label> &nbsp;&nbsp;
+            <label><input type="radio" name="diff" value="hard"> Higher</label>
+        </div>
+
+        <button class="btn btn-start" onclick="startGame()">START PRACTICE PAPER</button>
+    </div>
+
+    <div id="game-screen" class="hidden">
+        <div class="top-tools">
+            <span id="stat-topic" style="font-weight: bold; color: var(--secondary);">---</span>
+            <button class="btn btn-tool" onclick="toggleCalc()">🖩 Calculator</button>
+        </div>
+        
+        <div id="question-box">
+            <div id="calc-indicator" class="calc-badge"></div>
+            <div id="question-text"></div>
+        </div>
+
+        <div id="hint-text" class="hidden" style="color: var(--hint); margin-bottom: 15px; font-style: italic;"></div>
+        <input type="text" id="answer-input" placeholder="Type answer (e.g. 2x^2 + 5)" autocomplete="off">
+        <div id="feedback" style="margin-bottom: 20px; font-weight: bold; font-size: 1.1rem;"></div>
+
+        <button id="hint-btn" class="btn btn-hint" onclick="showHint()">Need a Hint?</button>
+        <button id="submit-btn" class="btn btn-submit" onclick="checkAnswer()">Submit</button>
+        <button id="next-btn" class="btn btn-next hidden" onclick="nextQuestion()">Next</button>
+    </div>
+
+    <div id="end-screen" class="hidden">
+        <h2>Assessment Complete</h2>
+        <h1 id="final-score" style="font-size: 3rem;">0 / 0</h1>
+        <button class="btn btn-start" onclick="location.reload()">New Session</button>
+    </div>
+</div>
+
+<script>
+    const rng = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
+
+    // DYNAMIC QUESTION GENERATORS (All Topics)
+    const questionGenerators = {
+        "Sequences (Linear)": {
+            easy: () => {
+                const diff = rng(2, 6); const start = rng(1, 10);
+                const seq = [start, start+diff, start+diff*2, start+diff*3];
+                return { q: `Find the n-th term of the sequence: ${seq.join(", ")}...`, a: `${diff}n${start-diff >= 0 ? '+' : ''}${start-diff == 0 ? '' : start-diff}`, h: "Find the common difference.", c: false };
+            }
+        },
+        "Sequences (Quadratic)": {
+            medium: () => {
+                const b = rng(1, 4); const c = rng(1, 5);
+                const f = (n) => (n**2) + b*n + c;
+                return { q: `Find the n-th term for this sequence: ${f(1)}, ${f(2)}, ${f(3)}, ${f(4)}...`, a: `n^2+${b}n+${c}`, h: "Find the second difference. Divide by 2 for the n² coefficient.", c: false };
+            }
+        },
+        "Factorization": {
+            easy: () => {
+                const a = rng(2, 6); const b = a * rng(2, 6);
+                return { q: `Factorize: ${a}x + ${b}`, a: `${a}(x+${b/a})`, h: "Take out the HCF.", c: false };
+            },
+            medium: () => {
+                const a = rng(2, 6); const b = a * rng(2, 7);
+                return { q: `Factorize fully: ${a}x² - ${b}x`, a: `${a}x(x-${b/a})`, h: "Take out number AND letter.", c: false };
+            },
+            hard: () => {
+                const r1 = rng(2, 8); const r2 = rng(2, 8);
+                return { q: `Factorize: x² + ${r1+r2}x + ${r1*r2}`, a: `(x+${r1})(x+${r2})`, h: "Multiply to make the last number, add to make the middle.", c: false };
+            }
+        },
+        "Expanding Brackets": {
+            easy: () => {
+                const a = rng(2, 9); const b = rng(1, 12);
+                return { q: `Expand: ${a}(x + ${b})`, a: `${a}x+${a*b}`, h: "Multiply outside by inside.", c: false };
+            },
+            medium: () => {
+                const r1 = rng(2, 6); const r2 = rng(2, 6);
+                return { q: `Expand and simplify: (x + ${r1})(x + ${r2})`, a: `x^2+${r1+r2}x+${r1*r2}`, h: "FOIL method.", c: false };
+            }
+        },
+        "Equations": {
+            medium: () => {
+                const a = rng(2, 5); const b = rng(1, 10); const x = rng(2, 8);
+                return { q: `Solve: ${a}x + ${b} = ${a*x+b}`, a: x.toString(), h: "Subtract constant, then divide.", c: false };
+            },
+            hard: () => {
+                const a = rng(2, 4); const x = rng(3, 9); const c = rng(2, 5);
+                return { q: `Solve: ${a}(x - ${c}) = ${a*(x-c)}`, a: x.toString(), h: "Expand bracket first, then solve.", c: false };
+            }
+        },
+        "Circles & Sectors": {
+            medium: () => {
+                const r = rng(3, 10);
+                return { q: `A circle has a radius of ${r}cm. Calculate the area to 1 decimal place. (Use the π button on the calculator).`, a: (Math.PI * r * r).toFixed(1), h: "Area = πr²", c: true };
+            },
+            hard: () => {
+                const d = rng(10, 20);
+                return { q: `A bicycle wheel has a diameter of ${d}cm. How far does it travel in one full rotation? (1 d.p. Use the π button on the calculator).`, a: (Math.PI * d).toFixed(1), h: "Distance = Circumference = πd", c: true };
+            }
+        },
+        "Similar Shapes": {
+            medium: () => {
+                const sf = rng(2, 4); const a1 = rng(10, 30);
+                return { q: `Shape A and B are similar. The length scale factor is ${sf}. Area of A is ${a1}cm². Find Area of B.`, a: (a1 * sf * sf).toString(), h: "Area SF = (Length SF)²", c: false };
+            }
+        },
+        "Probability": {
+            medium: () => {
+                const p = (rng(1, 4) * 0.1).toFixed(1); const trials = rng(5, 10) * 10;
+                return { q: `The probability of winning a game is ${p}. If you play ${trials} times, how many wins do you expect?`, a: (p * trials).toString(), h: "Multiply probability by number of trials.", c: true };
+            }
+        },
+        "Loci & Constructions": {
+            medium: () => {
+                return { q: `What geometrical construction finds the path of points exactly 5cm from a point A?`, a: "circle", h: "Think about the shape of a fixed distance.", c: false };
+            }
+        },
+        "Worded Real-Life": {
+            medium: () => {
+                const miles = rng(100, 250); const gallons = rng(4, 10);
+                return { q: `A car travels ${miles} miles using ${gallons} gallons. Calculate the MPG (Miles Per Gallon).`, a: (miles/gallons).toFixed(1), h: "Divide miles by gallons.", c: true };
+            }
+        }
+    };
+
+    let currentPool = [];
+    let score = 0;
+    let currentQuestionIndex = 0;
+    let calcStr = "";
+
+    // Menu Setup
+    const topicListDiv = document.getElementById('topic-list');
+    Object.keys(questionGenerators).forEach(topic => {
+        const div = document.createElement('div');
+        div.innerHTML = `<label><input type="checkbox" name="topic" value="${topic}" checked> ${topic}</label>`;
+        topicListDiv.appendChild(div);
+    });
+
+    function toggleAll(val) {
+        document.querySelectorAll('input[name="topic"]').forEach(cb => cb.checked = val);
+    }
+
+    // Calculator Logic
+    function toggleCalc() {
+        const calc = document.getElementById('calculator');
+        calc.style.display = calc.style.display === 'block' ? 'none' : 'block';
+    }
+    function calcInput(val) {
+        const display = document.getElementById('calc-display');
+        if (val === 'C') { calcStr = ""; }
+        else if (val === 'PI') { calcStr += Math.PI; }
+        else if (val === '=') {
+            try { calcStr = eval(calcStr).toString(); } 
+            catch(e) { calcStr = "Error"; }
+        } 
+        else { calcStr += val; }
+        display.value = calcStr;
+    }
+
+    function startGame() {
+        const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
+        const diff = document.querySelector('input[name="diff"]:checked').value;
+        
+        currentPool = [];
+        for(let i=0; i<10; i++) {
+            if(selectedTopics.length === 0) break;
+            const topic = selectedTopics[rng(0, selectedTopics.length - 1)];
+            const level = questionGenerators[topic][diff] ? diff : Object.keys(questionGenerators[topic])[0];
+            currentPool.push({ ...questionGenerators[topic][level](), topic: topic });
+        }
+
+        if (currentPool.length === 0) return alert("Select at least one topic!");
+        
+        score = 0;
+        currentQuestionIndex = 0;
+        document.getElementById('setup-screen').classList.add('hidden');
+        document.getElementById('game-screen').classList.remove('hidden');
+        showQuestion();
+    }
+
+    function showQuestion() {
+        const q = currentPool[currentQuestionIndex];
+        document.getElementById('stat-topic').innerText = q.topic;
+        document.getElementById('question-text').innerText = `Q${currentQuestionIndex + 1}: ${q.q}`;
+        
+        const badge = document.getElementById('calc-indicator');
+        badge.innerText = q.c ? "CALCULATOR" : "NON-CALC";
+        badge.className = q.c ? "calc-badge calc-yes" : "calc-badge calc-no";
+
+        document.getElementById('hint-text').classList.add('hidden');
+        document.getElementById('hint-btn').classList.remove('hidden');
+        document.getElementById('answer-input').value = "";
+        document.getElementById('answer-input').disabled = false;
+        document.getElementById('feedback').innerText = "";
+        document.getElementById('submit-btn').classList.remove('hidden');
+        document.getElementById('next-btn').classList.add('hidden');
+        document.getElementById('answer-input').focus();
+    }
+
+    function showHint() {
+        document.getElementById('hint-text').innerText = "HINT: " + currentPool[currentQuestionIndex].h;
+        document.getElementById('hint-text').classList.remove('hidden');
+        document.getElementById('hint-btn').classList.add('hidden');
+    }
+
+    // SMART PARSING: Standardizes spaces and powers
+    function normalizeAnswer(str) {
+        return str.toLowerCase()
+                  .replace(/\s+/g, '')        // Remove all spaces
+                  .replace(/²/g, '^2')       // Convert ² to ^2
+                  .replace(/³/g, '^3');      // Convert ³ to ^3
+    }
+
+    function checkAnswer() {
+        const rawUser = document.getElementById('answer-input').value;
+        if(rawUser === "") return;
+
+        const user = normalizeAnswer(rawUser);
+        const correct = normalizeAnswer(currentPool[currentQuestionIndex].a);
+        const feedback = document.getElementById('feedback');
+
+        if (user === correct) {
+            score++;
+            feedback.innerText = "CORRECT ✓";
+            feedback.style.color = "var(--success)";
+        } else {
+            let displayAnswer = currentPool[currentQuestionIndex].a.replace(/\^2/g, '²');
+            feedback.innerText = "INCORRECT. Expected: " + displayAnswer;
+            feedback.style.color = "var(--danger)";
+        }
+        
+        document.getElementById('answer-input').disabled = true;
+        document.getElementById('submit-btn').classList.add('hidden');
+        document.getElementById('next-btn').classList.remove('hidden');
+    }
+
+    function nextQuestion() {
+        currentQuestionIndex++;
+        if (currentQuestionIndex < currentPool.length) showQuestion();
+        else endGame();
+    }
+
+    function endGame() {
+        document.getElementById('game-screen').classList.add('hidden');
+        document.getElementById('end-screen').classList.remove('hidden');
+        document.getElementById('final-score').innerText = `${score} / ${currentPool.length}`;
+        document.getElementById('calculator').style.display = 'none'; // hide calc
+    }
+
+    document.getElementById('answer-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            if (!document.getElementById('submit-btn').classList.contains('hidden')) checkAnswer();
+            else nextQuestion();
+        }
+    });
+</script>
+</body>
+</html>

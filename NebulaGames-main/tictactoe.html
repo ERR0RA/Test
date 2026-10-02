@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Master of the Board</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@600;700&display=swap');
+
+    :root {
+      --ink: #28170f;
+      --paper: #f5ead5;
+      --gold: #e8ae55;
+      --red: #bd3b35;
+      --blue: #296b87;
+      --cream: #fff8eb;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--paper);
+      background:
+        radial-gradient(circle at 12% 10%, #70412d 0 1px, transparent 1.5px) 0 0 / 9px 9px,
+        linear-gradient(135deg, #1f100b, #4b281b 52%, #25130d);
+      font-family: "DM Mono", monospace;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .22;
+      background: repeating-linear-gradient(
+        104deg,
+        transparent 0 22px,
+        rgba(255,225,175,.18) 23px,
+        transparent 25px 55px
+      );
+      mix-blend-mode: soft-light;
+    }
+
+    main {
+      width: min(100%, 1050px);
+      margin: auto;
+      padding: clamp(22px, 4vw, 54px) 20px 42px;
+      position: relative;
+    }
+
+    .masthead {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+
+    .eyebrow {
+      margin: 0 0 7px;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: .18em;
+      font-size: .73rem;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: "Playfair Display", Georgia, serif;
+      font-size: clamp(2.25rem, 6vw, 4.8rem);
+      line-height: .93;
+      letter-spacing: -.05em;
+      text-shadow: 0 3px 0 #180c08;
+    }
+
+    .tag {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #f6d9af;
+      font-size: .74rem;
+      white-space: nowrap;
+    }
+
+    .tag i {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #8dd47d;
+      box-shadow: 0 0 0 4px rgba(141,212,125,.12);
+    }
+
+    .shell {
+      background: linear-gradient(135deg, rgba(255,244,225,.12), rgba(30,12,7,.22));
+      border: 1px solid rgba(245,234,213,.25);
+      border-radius: 22px;
+      box-shadow: 0 28px 70px rgba(0,0,0,.33), inset 0 1px rgba(255,255,255,.16);
+      overflow: hidden;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1.2fr repeat(3, 1fr) auto;
+      gap: 10px;
+      padding: 16px;
+      background: rgba(19,8,5,.28);
+      border-bottom: 1px solid rgba(245,234,213,.17);
+    }
+
+    label { min-width: 0; }
+
+    label span {
+      display: block;
+      color: #f2d8b3;
+      font-size: .64rem;
+      text-transform: uppercase;
+      letter-spacing: .11em;
+      margin: 0 0 6px 2px;
+    }
+
+    select,
+    button {
+      appearance: none;
+      width: 100%;
+      min-height: 45px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,248,235,.25);
+      font: 500 .78rem "DM Mono", monospace;
+    }
+
+    select {
+      color: var(--cream);
+      padding: 0 28px 0 12px;
+      background: linear-gradient(135deg, rgba(255,255,255,.13), rgba(255,255,255,.05));
+      cursor: pointer;
+    }
+
+    option { color: var(--ink); }
+
+    button {
+      align-self: end;
+      width: auto;
+      padding: 0 18px;
+      color: #2d170c;
+      border-color: #ffd187;
+      cursor: pointer;
+      background: linear-gradient(135deg, #f7ce84, #d9943e);
+      box-shadow: inset 0 1px rgba(255,255,255,.65), 0 4px 0 #9b5f23;
+      transition: transform .15s, filter .15s;
+    }
+
+    button:hover {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(3px);
+      box-shadow: none;
+    }
+
+    .play-area {
+      display: grid;
+      place-items: center;
+      min-height: calc(100vh - 315px);
+      padding: clamp(22px, 4vw, 46px);
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 13px;
+      margin-bottom: 24px;
+      color: #ffe9c7;
+      border: 1px solid rgba(247,206,132,.38);
+      border-radius: 99px;
+      background: rgba(20,8,5,.32);
+      font-size: .76rem;
+    }
+
+    .status::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      background: var(--gold);
+      border-radius: 50%;
+      box-shadow: 0 0 12px var(--gold);
+    }
+
+    .game-container {
+      display: grid;
+      gap: 7px;
+      padding: 11px;
+      background: linear-gradient(135deg, #7e4933, #3c1f14);
+      border: 1px solid #af7150;
+      border-radius: 16px;
+      box-shadow:
+        0 18px 34px rgba(0,0,0,.42),
+        inset 0 1px rgba(255,230,191,.25),
+        inset 0 0 0 5px rgba(29,12,7,.36);
+    }
+
+    .cell {
+      width: clamp(63px, 13vw, 104px);
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 9px;
+      color: var(--ink);
+      background: linear-gradient(135deg, #d8a97c, #b77c55);
+      box-shadow:
+        inset 2px 2px 4px rgba(255,241,209,.3),
+        inset -3px -3px 5px rgba(62,28,16,.35),
+        0 2px 0 rgba(42,16,9,.75);
+      font-family: "Playfair Display", serif;
+      font-size: clamp(2.25rem, 7vw, 4.2rem);
+      line-height: 1;
+      cursor: pointer;
+      transition: transform .15s, filter .15s, background .15s;
+    }
+
+    .cell:hover:not(.x):not(.o) {
+      transform: translateY(-2px);
+      filter: brightness(1.09);
+      background: linear-gradient(135deg, #e6bc91, #c48861);
+    }
+
+    .cell.x {
+      color: var(--red);
+      text-shadow: 1px 1px #f4c0a2, -2px -2px #7a211e;
+    }
+
+    .cell.o {
+      color: var(--blue);
+      text-shadow: 1px 1px #b5d5e0, -2px -2px #164557;
+    }
+
+    .ultimate-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: clamp(6px, 1.3vw, 13px);
+      padding: clamp(8px, 1.4vw, 14px);
+      background: linear-gradient(135deg, #6e3c29, #211008);
+      border: 1px solid #a96847;
+      border-radius: 17px;
+      box-shadow:
+        0 18px 34px rgba(0,0,0,.42),
+        inset 0 0 0 5px rgba(0,0,0,.25);
+    }
+
+    .sub-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 3px;
+      position: relative;
+      padding: 5px;
+      background: #8c553c;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      transition: .2s;
+    }
+
+    .sub-grid .cell {
+      width: clamp(25px, 5.6vw, 47px);
+      border-radius: 4px;
+      font-size: clamp(1rem, 3vw, 1.9rem);
+    }
+
+    .sub-grid.active {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 2px rgba(232,174,85,.25), 0 0 20px rgba(232,174,85,.35);
+    }
+
+    .sub-grid.won-x::after,
+    .sub-grid.won-o::after {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: grid;
+      place-items: center;
+      border-radius: 6px;
+      background: rgba(39,18,11,.84);
+      font: clamp(3rem, 9vw, 6.5rem)/1 "Playfair Display", serif;
+    }
+
+    .sub-grid.won-x::after {
+      content: "×";
+      color: var(--red);
+    }
+
+    .sub-grid.won-o::after {
+      content: "○";
+      color: var(--blue);
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 22px;
+      color: #d9b68e;
+      font-size: .66rem;
+    }
+
+    @media (max-width: 720px) {
+      .masthead { align-items: start; flex-direction: column; }
+      .controls { grid-template-columns: repeat(2, 1fr); }
+      .controls button { grid-column: span 2; width: 100%; }
+      .play-area { min-height: auto; }
+      .footer { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">A game of foresight</p>
+        <h1>Master of<br>the Board</h1>
+      </div>
+      <div class="tag"><i></i> Ready to play</div>
+    </header>
+
+    <section class="shell">
+      <div class="controls">
+        <label>
+          <span>Board type</span>
+          <select id="gameMode">
+            <option value="standard">Classic board</option>
+            <option value="ultimate">Ultimate board</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Grid</span>
+          <select id="gridSize">
+            <option value="3">3 × 3</option>
+            <option value="4">4 × 4</option>
+            <option value="5">5 × 5</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Players</span>
+          <select id="playerCount">
+            <option value="1">Solo vs bot</option>
+            <option value="2">Two players</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Bot skill</span>
+          <select id="difficulty">
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </label>
+
+        <button id="newGame">New game</button>
+      </div>
+
+      <div class="play-area">
+        <div>
+          <div id="status" class="status">Player X's turn</div>
+          <div id="board" class="game-container"></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Carved for careful thinkers.</span>
+      <span>Choose a square · take the board</span>
+    </footer>
+  </main>
+
+  <script>
+    let board = [];
+    let currentPlayer = "X";
+    let gameActive = true;
+    let isUltimate = false;
+    let nextSubGrid = -1;
+    let mainBoardWinners = Array(9).fill(null);
+
+    const boardElement = document.getElementById("board");
+    const statusElement = document.getElementById("status");
+
+    const setStatus = text => statusElement.textContent = text;
+
+    function initGame() {
+      const size = +document.getElementById("gridSize").value;
+      isUltimate = document.getElementById("gameMode").value === "ultimate";
+
+      currentPlayer = "X";
+      gameActive = true;
+      nextSubGrid = -1;
+      setStatus("Player X's turn");
+      boardElement.innerHTML = "";
+
+      isUltimate ? setupUltimateBoard() : setupStandardBoard(size);
+    }
+
+    function setupStandardBoard(size) {
+      board = Array(size * size).fill(null);
+      boardElement.className = "game-container";
+      boardElement.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+
+      for (let i = 0; i < board.length; i++) {
+        const square = createCell(i);
+        square.addEventListener("click", () => handleMove(i));
+        boardElement.append(square);
+      }
+    }
+
+    function createCell(index, subGrid) {
+      const square = document.createElement("button");
+      square.className = "cell";
+      square.type = "button";
+      square.dataset.index = index;
+
+      if (subGrid !== undefined) square.dataset.sub = subGrid;
+
+      return square;
+    }
+
+    function setupUltimateBoard() {
+      board = Array.from({ length: 9 }, () => Array(9).fill(null));
+      mainBoardWinners = Array(9).fill(null);
+
+      boardElement.className = "ultimate-grid";
+
+      for (let i = 0; i < 9; i++) {
+        const grid = document.createElement("div");
+        grid.className = "sub-grid";
+        grid.id = `sub-${i}`;
+
+        for (let j = 0; j < 9; j++) {
+          const square = createCell(j, i);
+          square.addEventListener("click", () => handleUltimateMove(i, j));
+          grid.append(square);
+        }
+
+        boardElement.append(grid);
+      }
+    }
+
+    function renderCell(cell, player) {
+      cell.textContent = player;
+      cell.classList.add(player.toLowerCase());
+    }
+
+    function handleMove(index) {
+      if (board[index] || !gameActive) return;
+
+      makeMove(index);
+
+      if (gameActive && document.getElementById("playerCount").value === "1") {
+        setTimeout(botMove, 420);
+      }
+    }
+
+    function makeMove(index) {
+      board[index] = currentPlayer;
+
+      renderCell(
+        document.querySelector(`[data-index="${index}"]`),
+        currentPlayer
+      );
+
+      if (checkWin(board, currentPlayer)) {
+        setStatus(`Player ${currentPlayer} wins!`);
+        gameActive = false;
+      } else if (board.every(Boolean)) {
+        setStatus("It's a draw.");
+        gameActive = false;
+      } else {
+        currentPlayer = currentPlayer === "X" ? "O" : "X";
+        setStatus(`Player ${currentPlayer}'s turn`);
+      }
+    }
+
+    function handleUltimateMove(subGrid, index) {
+      if (!gameActive) return;
+      if (nextSubGrid !== -1 && subGrid !== nextSubGrid) return;
+      if (board[subGrid][index] || mainBoardWinners[subGrid]) return;
+
+      board[subGrid][index] = currentPlayer;
+
+      renderCell(
+        document.querySelector(`[data-sub="${subGrid}"][data-index="${index}"]`),
+        currentPlayer
+      );
+
+      if (checkWin(board[subGrid], currentPlayer)) {
+        mainBoardWinners[subGrid] = currentPlayer;
+        document
+          .getElementById(`sub-${subGrid}`)
+          .classList.add(`won-${currentPlayer.toLowerCase()}`);
+      }
+
+      if (checkWin(mainBoardWinners, currentPlayer)) {
+        setStatus(`Player ${currentPlayer} wins the ultimate board!`);
+        gameActive = false;
+        return;
+      }
+
+      nextSubGrid = mainBoardWinners[index] ? -1 : index;
+
+      document.querySelectorAll(".sub-grid").forEach(grid => {
+        grid.classList.remove("active");
+      });
+
+      if (nextSubGrid !== -1) {
+        document.getElementById(`sub-${nextSubGrid}`).classList.add("active");
+      }
+
+      currentPlayer = currentPlayer === "X" ? "O" : "X";
+      setStatus(`Player ${currentPlayer}'s turn`);
+
+      if (
+        gameActive &&
+        document.getElementById("playerCount").value === "1" &&
+        currentPlayer === "O"
+      ) {
+        setTimeout(botMoveUltimate, 520);
+      }
+    }
+
+    function checkWin(gameBoard, player) {
+      const size = Math.sqrt(gameBoard.length);
+
+      for (let i = 0; i < size; i++) {
+        const row = Array.from({ length: size }, (_, j) => gameBoard[i * size + j]);
+        const column = Array.from({ length: size }, (_, j) => gameBoard[j * size + i]);
+
+        if (row.every(value => value === player)) return true;
+        if (column.every(value => value === player)) return true;
+      }
+
+      const diagonalOne = Array.from(
+        { length: size },
+        (_, i) => gameBoard[i * size + i]
+      );
+
+      const diagonalTwo = Array.from(
+        { length: size },
+        (_, i) => gameBoard[i * size + size - 1 - i]
+      );
+
+      return (
+        diagonalOne.every(value => value === player) ||
+        diagonalTwo.every(value => value === player)
+      );
+    }
+
+    function bestMove(gameBoard) {
+      const available = gameBoard
+        .map((value, index) => value ? null : index)
+        .filter(value => value !== null);
+
+      for (const player of ["O", "X"]) {
+        for (const move of available) {
+          const copy = [...gameBoard];
+          copy[move] = player;
+
+          if (checkWin(copy, player)) return move;
+        }
+      }
+
+      return available[Math.floor(Math.random() * available.length)];
+    }
+
+    function botMove() {
+      if (!gameActive) return;
+
+      const difficulty = document.getElementById("difficulty").value;
+
+      const available = board
+        .map((value, index) => value ? null : index)
+        .filter(value => value !== null);
+
+      const move =
+        difficulty === "hard" ||
+        (difficulty === "medium" && Math.random() > .48)
+          ? bestMove(board)
+          : available[Math.floor(Math.random() * available.length)];
+
+      if (move !== undefined) makeMove(move);
+    }
+
+    function botMoveUltimate() {
+      if (!gameActive) return;
+
+      let subGrid = nextSubGrid;
+
+      if (subGrid === -1 || mainBoardWinners[subGrid]) {
+        const availableGrids = mainBoardWinners
+          .map((value, index) => value === null ? index : null)
+          .filter(value => value !== null);
+
+        subGrid = availableGrids[
+          Math.floor(Math.random() * availableGrids.length)
+        ];
+      }
+
+      const availableCells = board[subGrid]
+        .map((value, index) => value ? null : index)
+        .filter(value => value !== null);
+
+      let move = bestMove(board[subGrid]);
+
+      if (!availableCells.includes(move)) move = availableCells[0];
+
+      handleUltimateMove(subGrid, move);
+    }
+
+    document.getElementById("newGame").addEventListener("click", initGame);
+
+    document.getElementById("gameMode").addEventListener("change", () => {
+      document.getElementById("gridSize").disabled =
+        document.getElementById("gameMode").value === "ultimate";
+
+      initGame();
+    });
+
+    initGame();
+  </script>
+</body>
+</html>

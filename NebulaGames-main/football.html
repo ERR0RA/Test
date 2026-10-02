@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEON 26</title>
+    <style>
+        body { margin: 0; background: #05050d; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; color: white; font-family: 'Arial Black', sans-serif; overflow: hidden; user-select: none; }
+        #canvas-wrapper { position: relative; border-radius: 16px; overflow: hidden; box-shadow: 0 0 80px rgba(0, 255, 136, 0.15); border: 1px solid rgba(255,255,255,0.1); }
+        canvas { background: #0b1c13; display: block; }
+        
+        #hud { display: flex; justify-content: space-between; width: 1100px; font-size: 40px; font-weight: 900; margin-bottom: 12px; font-style: italic; background: rgba(13, 17, 23, 0.85); padding: 10px 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); box-sizing: border-box;}
+        .red-score { color: #ff3838; text-shadow: 0 0 15px rgba(255,56,56,0.5); }
+        .blue-score { color: #17c0eb; text-shadow: 0 0 15px rgba(23,192,235,0.5); }
+        
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(6, 6, 14, 0.98); z-index: 10; transition: 0.3s; }
+        h1 { margin: 0 0 5px; color: #00ff88; font-size: 55px; letter-spacing: 4px; text-shadow: 0 0 35px rgba(0,255,136,0.4); text-align: center; }
+        h2 { margin: 0 0 30px; font-size: 14px; color: #8b949e; letter-spacing: 4px; font-weight: normal; text-transform: uppercase; }
+        
+        .mode-container { display: flex; gap: 20px; margin-bottom: 30px; }
+        .btn { padding: 18px 40px; font-size: 18px; font-family: inherit; background: rgba(255,255,255,0.05); border: 2px solid #30363d; color: white; border-radius: 12px; cursor: pointer; transition: 0.2s; font-weight: bold; text-transform: uppercase; }
+        .btn:hover { border-color: #00ff88; background: rgba(0, 255, 136, 0.05); }
+        .btn.selected { background: linear-gradient(135deg, #00ff88, #0575e6); border-color: transparent; box-shadow: 0 10px 25px rgba(0,255,136,0.3); }
+        .start-btn { padding: 16px 60px; font-size: 22px; border-radius: 30px; }
+        
+        #goal-banner { position: absolute; top: 40%; width: 100%; text-align: center; font-size: 85px; font-weight: 900; color: #fff; text-shadow: 0 0 30px #f1c40f; display: none; pointer-events: none; z-index: 5; font-style: italic; }
+        
+        .controls-grid { display: flex; gap: 20px; margin-top: 25px; text-align: left; width: 90%; max-width: 900px; }
+        .control-card { background: rgba(255,255,255,0.02); padding: 15px 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); font-size: 12px; font-family: 'Segoe UI', sans-serif; color: #a3b1cc; line-height: 1.6; flex: 1; }
+        .control-card b { color: #00ff88; display: block; font-size: 14px; margin-bottom: 5px; }
+        .control-card span { color: #ffcc00; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div id="hud">
+    <div id="s1" class="red-score">0</div>
+    <div style="font-size: 14px; align-self: center; letter-spacing: 8px; color: #8b949e; font-weight: normal;">NEON 26</div>
+    <div id="s2" class="blue-score">0</div>
+</div>
+
+<div id="canvas-wrapper">
+    <div id="menu-screen" class="overlay">
+        <h1 id="menu-title">NEON 26</h1>
+        <h2>Pro 5v5 Tactical Simulation</h2>
+        
+        <div class="mode-container">
+            <button id="btn-pve" class="btn selected" onclick="selectMode('pve')">Player vs Bot</button>
+            <button id="btn-pvp" class="btn" onclick="selectMode('pvp')">Player vs Player</button>
+        </div>
+
+        <button class="btn selected start-btn" onclick="initiateGame()">Kick Off</button>
+        
+        <div class="controls-grid">
+            <div id="card-red" class="control-card">
+                <b>TEAM RED (PLAYER 1)</b>
+                Movement: <span>[W, A, S, D]</span> or <span>[▲, ◀, ▼, ▶]</span><br>
+                Action (Pass/Shoot): <span>[Spacebar]</span><br>
+                Switch Player: <span>[F]</span> or <span>[▼]</span>
+            </div>
+            <div id="card-blue" class="control-card">
+                <b>TEAM BLUE (PLAYER 2 / BOT)</b>
+                Movement: <span>[▲, ◀, ▼, ▶]</span><br>
+                Action (Pass/Shoot): <span>[Enter]</span><br>
+                Switch Player: <span>[ShiftRight]</span> or <span>[▼]</span>
+            </div>
+        </div>
+    </div>
+    
+    <div id="goal-banner">GOAL!</div>
+    <canvas id="field"></canvas>
+</div>
+
+<script>
+    const canvas = document.getElementById('field');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 1100; canvas.height = 600;
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function synthSound(freq, type, duration, vol=0.12) {
+        try {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + duration);
+        } catch(e){}
+    }
+
+    const friction = 0.965; 
+    const MAX_SCORE = 5;
+    const GOAL_TOP = 220;
+    const GOAL_BOTTOM = 380;
+
+    let score1 = 0, score2 = 0;
+    let matchRunning = false;
+    let roundBreaking = false;
+    let screenShakeAmount = 0;
+    let gameMode = 'pve'; 
+    
+    const particles = [];
+    const ball = { x: 550, y: 300, z: 0, vx: 0, vy: 0, vz: 0, r: 10, bounciness: 0.55, lastTouchTeam: 0, trail: [] };
+
+    class Player {
+        constructor(x, y, color, team, id, role) {
+            this.startX = x; this.startY = y;
+            this.x = x; this.y = y; this.z = 0;
+            this.vx = 0; this.vy = 0;
+            this.color = color; this.team = team; this.id = id; this.role = role; 
+            this.active = false; this.radius = 15;
+            this.accel = 0.68; 
+            this.maxSpeed = 5.8; 
+            this.kickCooldown = 0;
+        }
+
+        update(isManual, controls) {
+            if(this.kickCooldown > 0) this.kickCooldown--;
+
+            if (isManual) {
+                let moveX = 0; let moveY = 0;
+                if (keys[controls.left] || (gameMode === 'pve' && keys['ArrowLeft'])) moveX -= 1;
+                if (keys[controls.right] || (gameMode === 'pve' && keys['ArrowRight'])) moveX += 1;
+                if (keys[controls.up] || (gameMode === 'pve' && keys['ArrowUp'])) moveY -= 1;
+                if (keys[controls.down] || (gameMode === 'pve' && keys['ArrowDown'])) moveY += 1;
+
+                if (moveX !== 0 || moveY !== 0) {
+                    let len = Math.sqrt(moveX*moveX + moveY*moveY);
+                    this.vx += (moveX / len) * this.accel;
+                    this.vy += (moveY / len) * this.accel;
+                } else {
+                    this.vx *= 0.78; this.vy *= 0.78; 
+                }
+
+                if ((keys[controls.action] || (gameMode === 'pve' && keys['Space'])) && this.kickCooldown === 0) {
+                    let dist = Math.hypot(ball.x - this.x, ball.y - this.y);
+                    if (dist < this.radius + ball.r + 18 && ball.z < 40) {
+                        this.executeKick();
+                    }
+                }
+            } else {
+                let targetX = this.startX;
+                let targetY = this.startY;
+                let distToBall = Math.hypot(ball.x - this.x, ball.y - this.y);
+
+                if (this.role === 'GK') {
+                    targetX = (this.team === 1) ? 45 : canvas.width - 45;
+                    targetY = Math.max(GOAL_TOP, Math.min(GOAL_BOTTOM, ball.y));
+                    if (distToBall < 80) {
+                        targetX = ball.x; targetY = ball.y;
+                    }
+                } else if (this.role === 'ST') {
+                    targetX = ball.x + (this.team === 1 ? 25 : -25);
+                    targetY = ball.y;
+                } else {
+                    let ballInfluence = (this.team === 1) ? (ball.x * 0.3) : ((canvas.width - ball.x) * -0.3);
+                    targetX = this.startX + ballInfluence;
+                    targetY = this.startY + (ball.y - 300) * 0.4;
+                    
+                    if (distToBall < 140 && ((this.team === 1 && ball.x < 650) || (this.team === 2 && ball.x > 450))) {
+                        targetX = ball.x; targetY = ball.y;
+                    }
+                }
+
+                let dx = targetX - this.x; let dy = targetY - this.y;
+                let dist = Math.hypot(dx, dy);
+                if (dist > 8) {
+                    this.vx += (dx / dist) * (this.accel * 0.88);
+                    this.vy += (dy / dist) * (this.accel * 0.88);
+                }
+
+                if (distToBall < this.radius + ball.r + 5 && ball.z < 25 && Math.random() < 0.2) {
+                    this.executeKick();
+                }
+            }
+
+            let speed = Math.hypot(this.vx, this.vy);
+            if (speed > this.maxSpeed) {
+                this.vx = (this.vx / speed) * this.maxSpeed;
+                this.vy = (this.vy / speed) * this.maxSpeed;
+            }
+
+            this.x += this.vx; this.y += this.vy;
+
+            if (this.x < 25) { this.x = 25; this.vx = 0; }
+            if (this.x > canvas.width - 25) { this.x = canvas.width - 25; this.vx = 0; }
+            if (this.y < 25) { this.y = 25; this.vy = 0; }
+            if (this.y > canvas.height - 25) { this.y = canvas.height - 25; this.vy = 0; }
+
+            let ballDist = Math.hypot(ball.x - this.x, ball.y - this.y);
+            if (ballDist < this.radius + ball.r + 2 && ball.z < 20 && !roundBreaking) {
+                ball.lastTouchTeam = this.team;
+                let angle = Math.atan2(ball.y - this.y, ball.x - this.x);
+                ball.vx = Math.cos(angle) * 4.2 + this.vx * 0.6;
+                ball.vy = Math.sin(angle) * 4.2 + this.vy * 0.6;
+            }
+        }
+
+        executeKick() {
+            this.kickCooldown = 20;
+            let targetGoalX = (this.team === 1) ? canvas.width - 25 : 25;
+            let targetGoalY = 300 + (Math.random() - 0.5) * 60; 
+            let angle = Math.atan2(targetGoalY - this.y, targetGoalX - this.x);
+            
+            ball.vx = Math.cos(angle) * 17.0;
+            ball.vy = Math.sin(angle) * 17.0;
+            ball.vz = 4.5 + Math.random() * 4; 
+
+            screenShakeAmount = 5;
+            synthSound(360, 'triangle', 0.16, 0.2);
+            createParticles(ball.x, ball.y, '#ffffff', 10);
+        }
+
+        draw() {
+            ctx.save();
+            ctx.fillStyle = "rgba(0,0,0,0.35)";
+            ctx.beginPath(); ctx.ellipse(this.x, this.y + 2, this.radius, this.radius*0.5, 0, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+
+            ctx.save();
+            ctx.lineWidth = this.active ? 4 : 2;
+            ctx.strokeStyle = this.active ? '#ffffff' : 'rgba(255,255,255,0.25)';
+            ctx.fillStyle = this.color;
+            ctx.shadowBlur = this.active ? 15 : 0; ctx.shadowColor = this.color;
+
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.restore();
+
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(this.role, this.x, this.y + 3);
+
+            if (this.active) {
+                ctx.save(); ctx.fillStyle = "#ffcc00"; ctx.beginPath();
+                ctx.moveTo(this.x, this.y - 23); ctx.lineTo(this.x - 5, this.y - 30); ctx.lineTo(this.x + 5, this.y - 30);
+                ctx.fill(); ctx.restore();
+            }
+        }
+    }
+
+    const teamRed = [
+        new Player(60, 300, '#ff3838', 1, 0, 'GK'),
+        new Player(250, 180, '#ff3838', 1, 1, 'DEF'),
+        new Player(250, 420, '#ff3838', 1, 2, 'DEF'),
+        new Player(440, 300, '#ff3838', 1, 3, 'MID'),
+        new Player(520, 300, '#ff3838', 1, 4, 'ST')
+    ];
+
+    const teamBlue = [
+        new Player(1040, 300, '#17c0eb', 2, 0, 'GK'),
+        new Player(850, 180, '#17c0eb', 2, 1, 'DEF'),
+        new Player(850, 420, '#17c0eb', 2, 2, 'DEF'),
+        new Player(660, 300, '#17c0eb', 2, 3, 'MID'),
+        new Player(580, 300, '#17c0eb', 2, 4, 'ST')
+    ];
+
+    let activeRedIndex = 4; 
+    let activeBlueIndex = 4;
+    teamRed[activeRedIndex].active = true;
+    teamBlue[activeBlueIndex].active = true;
+
+    const keys = {};
+    window.onkeydown = e => {
+        keys[e.code] = true;
+        
+        if (matchRunning) {
+            if (gameMode === 'pve') {
+                if (e.code === 'KeyF' || e.code === 'ArrowDown') {
+                    teamRed[activeRedIndex].active = false;
+                    do { activeRedIndex = (activeRedIndex + 1) % 5; } while(teamRed[activeRedIndex].role === 'GK');
+                    teamRed[activeRedIndex].active = true;
+                    synthSound(580, 'sine', 0.04, 0.05);
+                }
+            } else {
+                if (e.code === 'KeyF' || e.code === 'KeyS') {
+                    teamRed[activeRedIndex].active = false;
+                    do { activeRedIndex = (activeRedIndex + 1) % 5; } while(teamRed[activeRedIndex].role === 'GK');
+                    teamRed[activeRedIndex].active = true;
+                    synthSound(580, 'sine', 0.04, 0.05);
+                }
+                if (e.code === 'ShiftRight' || e.code === 'ArrowDown') {
+                    teamBlue[activeBlueIndex].active = false;
+                    do { activeBlueIndex = (activeBlueIndex + 1) % 5; } while(teamBlue[activeBlueIndex].role === 'GK');
+                    teamBlue[activeBlueIndex].active = true;
+                    synthSound(620, 'sine', 0.04, 0.05);
+                }
+            }
+        }
+    };
+    window.onkeyup = e => { keys[e.code] = false; };
+
+    function selectMode(mode) {
+        gameMode = mode;
+        document.getElementById('btn-pve').classList.toggle('selected', mode === 'pve');
+        document.getElementById('btn-pvp').classList.toggle('selected', mode === 'pvp');
+        
+        const blueCard = document.getElementById('card-blue');
+        if (mode === 'pve') {
+            blueCard.innerHTML = "<b>TEAM BLUE (CPU BOT)</b>Controlled entirely by autonomous positional squad logic patterns.";
+        } else {
+            blueCard.innerHTML = "<b>TEAM BLUE (PLAYER 2)</b>Movement: <span>[▲, ◀, ▼, ▶]</span><br>Action (Pass/Shoot): <span>[Enter]</span><br>Switch Player: <span>[ShiftRight]</span> or <span>[▼]</span>";
+        }
+    }
+
+    function createParticles(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+            particles.push({
+                x: x, y: y, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8,
+                radius: Math.random() * 3 + 1, alpha: 1, color: color
+            });
+        }
+    }
+
+    function initiateGame() {
+        document.getElementById('menu-screen').style.display = 'none';
+        score1 = 0; score2 = 0;
+        resetPitchState();
+        matchRunning = true;
+    }
+
+    function resetPitchState() {
+        ball.x = 550; ball.y = 300; ball.z = 0;
+        ball.vx = 0; ball.vy = 0; ball.vz = 0; ball.trail = [];
+
+        teamRed.forEach(p => { p.x = p.startX; p.y = p.startY; p.vx = 0; p.vy = 0; });
+        teamBlue.forEach(p => { p.x = p.startX; p.y = p.startY; p.vx = 0; p.vy = 0; });
+        roundBreaking = false;
+    }
+
+    function registerGoal(scoringTeam) {
+        roundBreaking = true;
+        if (scoringTeam === 1) score1++; else score2++;
+
+        screenShakeAmount = 22;
+        // Sound synth tracking removed from this block completely
+
+        createParticles(ball.x, ball.y, scoringTeam === 1 ? '#ff3838' : '#17c0eb', 30);
+
+        const banner = document.getElementById('goal-banner');
+        banner.innerText = scoringTeam === 1 ? "RED GOAL!" : "BLUE GOAL!";
+        banner.style.color = scoringTeam === 1 ? "#ff3838" : "#17c0eb";
+        banner.style.display = 'block';
+
+        setTimeout(() => {
+            banner.style.display = 'none';
+            if (score1 >= MAX_SCORE || score2 >= MAX_SCORE) endMatch(); else resetPitchState();
+        }, 2000);
+    }
+
+    function endMatch() {
+        matchRunning = false;
+        const menuScreen = document.getElementById('menu-screen');
+        const menuTitle = document.getElementById('menu-title');
+        menuTitle.innerText = score1 >= MAX_SCORE ? "RED TEAM VICTORY" : "BLUE TEAM VICTORY";
+        menuTitle.style.color = score1 >= MAX_SCORE ? "#ff3838" : "#17c0eb";
+        menuScreen.style.display = 'flex';
+    }
+
+    function loop() {
+        updateGameObjects();
+        renderGraphics();
+        requestAnimationFrame(loop);
+    }
+
+    function updateGameObjects() {
+        if (!matchRunning) return;
+
+        teamRed.forEach((p, i) => p.update(i === activeRedIndex, {up:'KeyW', left:'KeyA', right:'KeyD', down:'KeyS', action:'Space'}));
+        teamBlue.forEach((p, i) => {
+            let isManual = (gameMode === 'pvp') ? (i === activeBlueIndex) : false;
+            p.update(isManual, {up:'ArrowUp', left:'ArrowLeft', right:'ArrowRight', down:'ArrowDown', action:'Enter'});
+        });
+
+        if (!roundBreaking) {
+            ball.vx *= friction; ball.vy *= friction;
+            if (ball.z > 0) ball.vz -= 0.24; else { ball.vz = 0; ball.z = 0; }
+
+            ball.x += ball.vx; ball.y += ball.vy; ball.z += ball.vz;
+            if (ball.z < 0) { ball.z = 0; ball.vz = -ball.vz * ball.bounciness; }
+
+            ball.trail.push({x: ball.x, y: ball.y - ball.z});
+            if (ball.trail.length > 8) ball.trail.shift();
+        }
+
+        if (ball.x < 25) {
+            if (ball.y > GOAL_TOP && ball.y < GOAL_BOTTOM && ball.z < 80) registerGoal(2);
+            else { ball.vx *= -0.6; ball.x = 25; }
+        }
+        if (ball.x > canvas.width - 25) {
+            if (ball.y > GOAL_TOP && ball.y < GOAL_BOTTOM && ball.z < 80) registerGoal(1);
+            else { ball.vx *= -0.6; ball.x = canvas.width - 25; }
+        }
+        if (ball.y < 25) { ball.vy *= -0.6; ball.y = 25; }
+        if (ball.y > canvas.height - 25) { ball.vy *= -0.6; ball.y = canvas.height - 25; }
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i]; p.x += p.vx; p.y += p.vy; p.alpha -= 0.03;
+            if (p.alpha <= 0) particles.splice(i, 1);
+        }
+    }
+
+    function renderGraphics() {
+        ctx.save();
+        if (screenShakeAmount > 0) {
+            ctx.translate((Math.random() - 0.5) * screenShakeAmount, (Math.random() - 0.5) * screenShakeAmount);
+            screenShakeAmount *= 0.88;
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.fillStyle = "#0c2015"; ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = "#0e2418";
+        for (let i = 0; i < canvas.width; i += 110) {
+            if((i/110)%2===0) ctx.fillRect(i, 0, 55, canvas.height);
+        }
+
+        ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.lineWidth = 3;
+        ctx.strokeRect(25, 25, canvas.width - 50, canvas.height - 50);
+        ctx.beginPath(); ctx.moveTo(canvas.width/2, 25); ctx.lineTo(canvas.width/2, canvas.height-25); ctx.stroke();
+        ctx.beginPath(); ctx.arc(canvas.width/2, canvas.height/2, 90, 0, Math.PI*2); ctx.stroke();
+
+        ctx.strokeRect(25, 120, 150, 360); ctx.strokeRect(canvas.width - 175, 120, 150, 360);
+
+        ctx.strokeStyle = "#ff3838"; ctx.strokeRect(5, GOAL_TOP, 20, GOAL_BOTTOM - GOAL_TOP);
+        ctx.strokeStyle = "#17c0eb"; ctx.strokeRect(canvas.width - 25, GOAL_TOP, 20, GOAL_BOTTOM - GOAL_TOP);
+
+        if (matchRunning && !roundBreaking) {
+            let shadowSize = Math.max(3, ball.r - (ball.z * 0.1));
+            ctx.fillStyle = "rgba(0, 0, 0, 0.4)"; ctx.beginPath();
+            ctx.ellipse(ball.x, ball.y, shadowSize, shadowSize * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+        }
+
+        teamRed.forEach(p => p.draw());
+        teamBlue.forEach(p => p.draw());
+
+        particles.forEach(p => {
+            ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill(); ctx.restore();
+        });
+
+        if (matchRunning && !roundBreaking) {
+            ball.trail.forEach((pos, idx) => {
+                ctx.save(); ctx.globalAlpha = (idx / ball.trail.length) * 0.2; ctx.fillStyle = "#00ff88";
+                ctx.beginPath(); ctx.arc(pos.x, pos.y, ball.r * (idx / ball.trail.length), 0, Math.PI*2); ctx.fill(); ctx.restore();
+            });
+
+            ctx.save(); ctx.translate(ball.x, ball.y - ball.z);
+            ctx.shadowBlur = 12; ctx.shadowColor = "#00ff88"; ctx.fillStyle = "#ffffff";
+            ctx.beginPath(); ctx.arc(0, 0, ball.r, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = "#0d1117"; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
+        }
+
+        ctx.restore();
+
+        document.getElementById('s1').innerText = score1;
+        document.getElementById('s2').innerText = score2;
+    }
+
+    loop();
+</script>
+</body>
+</html>

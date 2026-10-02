@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cricket PvP Ultra</title>
+
+<style>
+
+body{
+  margin:0;
+  overflow:hidden;
+  font-family:system-ui;
+  background:radial-gradient(circle at top,#0b1220,#05060a);
+  color:white;
+}
+
+/* CANVAS */
+canvas{
+  display:block;
+  margin:auto;
+  background:
+    radial-gradient(circle at center top,#1a2a4a,#0c1a2e 40%,#0a3b1f 41%,#06401f 100%);
+  box-shadow:0 0 60px rgba(0,255,140,0.15);
+}
+
+/* HUD */
+#ui{
+  position:absolute;
+  top:15px;
+  width:100%;
+  display:flex;
+  justify-content:center;
+  gap:20px;
+  z-index:10;
+}
+
+.panel{
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.15);
+  backdrop-filter:blur(14px);
+  padding:10px 18px;
+  border-radius:14px;
+  font-weight:600;
+  letter-spacing:1px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.4);
+}
+
+/* MESSAGE */
+#msg{
+  position:absolute;
+  top:45%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  font-size:64px;
+  font-weight:900;
+  opacity:0;
+  transition:0.25s;
+  text-shadow:0 0 30px rgba(255,200,0,0.6);
+}
+
+/* TIMING BAR */
+#bar{
+  position:absolute;
+  bottom:40px;
+  left:50%;
+  transform:translateX(-50%);
+  width:320px;
+  height:14px;
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.2);
+  border-radius:999px;
+  overflow:hidden;
+  backdrop-filter:blur(10px);
+}
+
+#zone{
+  position:absolute;
+  left:42%;
+  width:16%;
+  height:100%;
+  background:linear-gradient(90deg,#00ff88,#00c3ff);
+  box-shadow:0 0 15px rgba(0,255,150,0.5);
+}
+
+#marker{
+  position:absolute;
+  width:6px;
+  height:100%;
+  background:white;
+  box-shadow:0 0 10px white;
+}
+
+/* BAT GLOW (visual only via canvas style) */
+
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+  <div class="panel">P1: <span id="p1">0</span></div>
+  <div class="panel">P2: <span id="p2">0</span></div>
+  <div class="panel">TARGET: <span id="target">0</span></div>
+  <div class="panel">WICKETS: <span id="wickets">3</span></div>
+</div>
+
+<div id="msg"></div>
+
+<div id="bar">
+  <div id="zone"></div>
+  <div id="marker"></div>
+</div>
+
+<canvas id="c"></canvas>
+
+<script>
+
+const c=document.getElementById("c");
+const ctx=c.getContext("2d");
+
+c.width=innerWidth;
+c.height=innerHeight;
+
+let state="P1";
+let p1=0,p2=0,wickets=3,target=0;
+
+let bat={x:c.width/2,y:c.height-140};
+let ball={x:0,y:0,vx:0,vy:0,active:false,curve:0,fire:false};
+
+let bowler={aim:0};
+
+let pos=0,dir=1;
+let marker=document.getElementById("marker");
+
+let shake=0;
+
+/* UI TEXT */
+function msg(t){
+  let m=document.getElementById("msg");
+  m.innerText=t;
+  m.style.opacity=1;
+  setTimeout(()=>m.style.opacity=0,700);
+}
+
+/* BOWL */
+function bowl(){
+  if(ball.active) return;
+
+  ball.x=c.width/2;
+  ball.y=140;
+
+  ball.vx=bowler.aim;
+  ball.vy=7+Math.random()*3;
+  ball.curve=(Math.random()-0.5)*1.8;
+
+  ball.active=true;
+  ball.fire=false;
+}
+
+/* SWING */
+function swing(){
+
+  if(!ball.active) return;
+
+  let dist=Math.abs(ball.x-bat.x);
+  let timing=pos/320;
+
+  let perfect=timing>0.42 && timing<0.58;
+
+  if(dist<85){
+
+    let runs=1;
+
+    if(perfect){
+      runs=6;
+      ball.fire=true;
+      shake=18;
+      msg("SIX!");
+    } else {
+      runs=Math.random()>0.5?4:1;
+      msg(runs+" RUN");
+    }
+
+    if(state==="P1"){
+      p1+=runs;
+      document.getElementById("p1").innerText=p1;
+    } else {
+      p2+=runs;
+      document.getElementById("p2").innerText=p2;
+    }
+
+    ball.active=false;
+  }
+}
+
+/* OUT */
+function out(){
+  wickets--;
+  document.getElementById("wickets").innerText=wickets;
+  msg("OUT!");
+  ball.active=false;
+
+  if(wickets<=0) next();
+}
+
+/* NEXT INNINGS */
+function next(){
+
+  if(state==="P1"){
+    state="P2";
+    wickets=3;
+    target=p1+1;
+    document.getElementById("target").innerText=target;
+    msg("P2 CHASE");
+  } else {
+    alert(p1>p2?"PLAYER 1 WINS":"PLAYER 2 WINS");
+    location.reload();
+  }
+}
+
+/* BALL UPDATE */
+function updateBall(){
+
+  if(!ball.active) return;
+
+  ball.x+=ball.vx+ball.curve;
+  ball.y+=ball.vy;
+  ball.vy+=0.22;
+
+  if(ball.y>bat.y && Math.abs(ball.x-bat.x)<35){
+    out();
+  }
+
+  if(ball.y>c.height){
+    ball.active=false;
+    setTimeout(bowl,700);
+  }
+}
+
+/* TIMING BAR */
+function timing(){
+
+  pos+=4*dir;
+  if(pos>300)dir=-1;
+  if(pos<0)dir=1;
+
+  marker.style.left=pos+"px";
+}
+
+/* DRAW STADIUM */
+function drawBackground(){
+
+  // subtle glow grass
+  let g=ctx.createRadialGradient(
+    c.width/2,c.height,50,
+    c.width/2,c.height,600
+  );
+
+  g.addColorStop(0,"#0f5f2d");
+  g.addColorStop(1,"#06120a");
+
+  ctx.fillStyle=g;
+  ctx.fillRect(0,0,c.width,c.height);
+
+  // floodlight glow
+  ctx.fillStyle="rgba(255,255,255,0.03)";
+  ctx.beginPath();
+  ctx.arc(c.width/2,120,300,0,Math.PI*2);
+  ctx.fill();
+}
+
+/* DRAW */
+function draw(){
+
+  if(shake>0){
+    shake*=0.85;
+    ctx.setTransform(1,0,0,1,(Math.random()-0.5)*shake,(Math.random()-0.5)*shake);
+  } else ctx.setTransform(1,0,0,1,0,0);
+
+  drawBackground();
+
+  // pitch
+  ctx.fillStyle="rgba(210,180,120,0.9)";
+  ctx.fillRect(c.width/2-120,140,240,c.height);
+
+  // bat (smooth)
+  ctx.fillStyle="#ff8c00";
+  ctx.shadowBlur=20;
+  ctx.shadowColor="#ff6a00";
+  ctx.fillRect(bat.x-65,bat.y,130,16);
+  ctx.shadowBlur=0;
+
+  // ball
+  if(ball.active){
+    ctx.fillStyle=ball.fire?"#ff4400":"#ff2d2d";
+    ctx.shadowBlur=25;
+    ctx.shadowColor=ball.fire?"orange":"red";
+    ctx.beginPath();
+    ctx.arc(ball.x,ball.y,10,0,Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur=0;
+  }
+
+  updateBall();
+  timing();
+
+  requestAnimationFrame(draw);
+}
+
+/* INPUT */
+window.addEventListener("mousemove",e=>{
+  bat.x=e.clientX;
+});
+
+window.addEventListener("keydown",e=>{
+  if(e.code==="Space") swing();
+  if(e.key==="ArrowLeft") bowler.aim=-2;
+  if(e.key==="ArrowRight") bowler.aim=2;
+  if(e.key==="ArrowUp") bowl();
+});
+
+window.addEventListener("keyup",()=>{
+  bowler.aim=0;
+});
+
+/* START */
+setTimeout(bowl,900);
+draw();
+
+</script>
+
+</body>
+</html>

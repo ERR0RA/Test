@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Neon Blaster Arena</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: Arial, sans-serif;
+  touch-action: manipulation;
+}
+
+body {
+  background: radial-gradient(circle at top, #111827, #020617 75%);
+  color: white;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+}
+
+h1 {
+  margin-top: 12px;
+  font-size: 2.2rem;
+  color: #00f5ff;
+  text-shadow: 0 0 12px #00f5ff, 0 0 30px #8b5cf6;
+}
+
+#menu {
+  margin: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+button, select {
+  padding: 12px 18px;
+  border-radius: 16px;
+  border: none;
+  font-size: 1rem;
+  color: white;
+  background: linear-gradient(135deg, #00f5ff, #8b5cf6);
+  box-shadow: 0 0 15px #00f5ff;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+button:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 25px #00f5ff, 0 0 45px #8b5cf6;
+}
+
+#info {
+  margin-bottom: 8px;
+  color: #c4b5fd;
+  font-size: 1rem;
+}
+
+canvas {
+  width: min(96vw, 1000px);
+  height: min(72vh, 600px);
+  border-radius: 22px;
+  border: 3px solid #00f5ff;
+  background: radial-gradient(circle, #111827, #020617);
+  box-shadow: 0 0 20px #00f5ff, 0 0 40px #8b5cf6;
+}
+
+#mobileControls {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  padding: 14px;
+}
+
+.controlSide {
+  display: flex;
+  gap: 10px;
+}
+
+.controlBtn {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: none;
+  font-size: 1.4rem;
+  color: white;
+  background: rgba(0,245,255,0.15);
+  box-shadow: 0 0 18px #00f5ff;
+}
+
+@media (min-width: 900px) {
+  #mobileControls {
+    display: none;
+  }
+}
+</style>
+</head>
+<body>
+
+<h1>⚡ Neon Blaster Arena ⚡</h1>
+
+<div id="menu">
+  <select id="mode">
+    <option value="1">1 Player vs Bot</option>
+    <option value="2">2 Players</option>
+    <option value="3">Bot vs Bot</option>
+  </select>
+  <button onclick="restartGame()">Start Match</button>
+</div>
+
+<div id="info">Shoot neon energy blasts • First to 10 points wins</div>
+
+<canvas id="game" width="1000" height="600"></canvas>
+
+<div id="mobileControls">
+  <div class="controlSide">
+    <button class="controlBtn" id="up1">▲</button>
+    <button class="controlBtn" id="down1">▼</button>
+    <button class="controlBtn" id="shoot1">●</button>
+  </div>
+
+  <div class="controlSide">
+    <button class="controlBtn" id="up2">▲</button>
+    <button class="controlBtn" id="down2">▼</button>
+    <button class="controlBtn" id="shoot2">●</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+let mode = 1;
+let particles = [];
+let bullets = [];
+let gameOver = false;
+
+const keys = {};
+document.addEventListener('keydown', e => keys[e.key] = true);
+document.addEventListener('keyup', e => keys[e.key] = false);
+
+const p1 = {
+  x: 80,
+  y: 260,
+  w: 40,
+  h: 40,
+  color: '#00f5ff',
+  score: 0,
+  cooldown: 0
+};
+
+const p2 = {
+  x: 880,
+  y: 260,
+  w: 40,
+  h: 40,
+  color: '#ff00ff',
+  score: 0,
+  cooldown: 0
+};
+
+function restartGame() {
+  mode = parseInt(document.getElementById('mode').value);
+  p1.score = 0;
+  p2.score = 0;
+  bullets = [];
+  particles = [];
+  gameOver = false;
+}
+
+function shoot(player, dir) {
+  if(player.cooldown <= 0) {
+    bullets.push({
+      x: player.x + player.w/2,
+      y: player.y + player.h/2,
+      dx: dir,
+      color: player.color,
+      owner: player
+    });
+    player.cooldown = 25;
+  }
+}
+
+function updatePlayers() {
+  if(mode !== 3) {
+    if(keys['ArrowUp']) p1.y -= 6;
+    if(keys['ArrowDown']) p1.y += 6;
+    if(keys['/']) shoot(p1, 9);
+  }
+
+  if(mode === 2) {
+    if(keys['w']) p2.y -= 6;
+    if(keys['s']) p2.y += 6;
+    if(keys[' ']) shoot(p2, -9);
+  }
+
+  if(mode === 1 || mode === 3) {
+    if(p2.y < p1.y) p2.y += 4;
+    if(p2.y > p1.y) p2.y -= 4;
+    if(Math.random() < 0.04) shoot(p2, -9);
+  }
+
+  if(mode === 3) {
+    if(p1.y < p2.y) p1.y += 4;
+    if(p1.y > p2.y) p1.y -= 4;
+    if(Math.random() < 0.04) shoot(p1, 9);
+  }
+
+  p1.y = Math.max(0, Math.min(canvas.height-p1.h, p1.y));
+  p2.y = Math.max(0, Math.min(canvas.height-p2.h, p2.y));
+
+  if(p1.cooldown > 0) p1.cooldown--;
+  if(p2.cooldown > 0) p2.cooldown--;
+}
+
+function updateBullets() {
+  bullets.forEach((b, index) => {
+    b.x += b.dx;
+
+    if(
+      b.owner !== p1 &&
+      b.x < p1.x+p1.w &&
+      b.y > p1.y &&
+      b.y < p1.y+p1.h
+    ) {
+      p2.score++;
+      explode(b.x,b.y,b.color);
+      bullets.splice(index,1);
+    }
+
+    if(
+      b.owner !== p2 &&
+      b.x > p2.x &&
+      b.y > p2.y &&
+      b.y < p2.y+p2.h
+    ) {
+      p1.score++;
+      explode(b.x,b.y,b.color);
+      bullets.splice(index,1);
+    }
+
+    if(b.x < 0 || b.x > canvas.width) {
+      bullets.splice(index,1);
+    }
+  });
+}
+
+function explode(x,y,color) {
+  for(let i=0;i<18;i++) {
+    particles.push({
+      x,y,
+      dx:(Math.random()-0.5)*8,
+      dy:(Math.random()-0.5)*8,
+      life:40,
+      color
+    });
+  }
+}
+
+function updateParticles() {
+  particles.forEach((p,index)=>{
+    p.x += p.dx;
+    p.y += p.dy;
+    p.life--;
+
+    if(p.life <= 0) {
+      particles.splice(index,1);
+    }
+  });
+}
+
+function neonRect(x,y,w,h,color) {
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 25;
+  ctx.fillStyle = color;
+  ctx.fillRect(x,y,w,h);
+  ctx.shadowBlur = 0;
+}
+
+function drawBackground() {
+  for(let i=0;i<80;i++) {
+    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 2, 2);
+  }
+}
+
+function draw() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  drawBackground();
+
+  neonRect(p1.x,p1.y,p1.w,p1.h,p1.color);
+  neonRect(p2.x,p2.y,p2.w,p2.h,p2.color);
+
+  bullets.forEach(b => {
+    ctx.beginPath();
+    ctx.arc(b.x,b.y,8,0,Math.PI*2);
+    ctx.fillStyle = b.color;
+    ctx.shadowColor = b.color;
+    ctx.shadowBlur = 20;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  });
+
+  particles.forEach(p => {
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x,p.y,4,4);
+  });
+
+  ctx.font = '34px Arial';
+  ctx.fillStyle = '#00f5ff';
+  ctx.fillText(p1.score, 430, 50);
+  ctx.fillStyle = '#ff00ff';
+  ctx.fillText(p2.score, 540, 50);
+
+  if(p1.score >= 10 || p2.score >= 10) {
+    gameOver = true;
+    ctx.font = '55px Arial';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(
+      p1.score >= 10 ? 'Player 1 Wins!' : 'Player 2 Wins!',
+      300,
+      300
+    );
+  }
+
+  if(!gameOver) {
+    updatePlayers();
+    updateBullets();
+    updateParticles();
+  }
+
+  requestAnimationFrame(draw);
+}
+
+function hold(btn,key) {
+  btn.addEventListener('touchstart', e => {
+    e.preventDefault();
+    keys[key] = true;
+  });
+
+  btn.addEventListener('touchend', e => {
+    e.preventDefault();
+    keys[key] = false;
+  });
+}
+
+hold(document.getElementById('up1'),'ArrowUp');
+hold(document.getElementById('down1'),'ArrowDown');
+hold(document.getElementById('shoot1'),'/');
+
+hold(document.getElementById('up2'),'w');
+hold(document.getElementById('down2'),'s');
+hold(document.getElementById('shoot2'),' ');
+
+draw();
+</script>
+
+</body>
+</html>

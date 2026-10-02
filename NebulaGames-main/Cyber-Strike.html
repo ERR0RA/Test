@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nebula | Glass Interface</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;500;800&family=Fira+Code:wght@400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00ff88;
+            --primary-glow: rgba(0, 255, 136, 0.4);
+            --bg: #050608;
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --text: #ffffff;
+        }
+
+        [data-theme="cyber"] { --primary: #ff00ff; --primary-glow: rgba(255, 0, 255, 0.4); }
+        [data-theme="ocean"] { --primary: #00d9ff; --primary-glow: rgba(0, 217, 255, 0.4); }
+        [data-theme="amber"] { --primary: #ffaa00; --primary-glow: rgba(255, 170, 0, 0.4); }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 0% 0%, rgba(0, 255, 136, 0.07) 0%, transparent 40%),
+                radial-gradient(circle at 100% 100%, rgba(0, 217, 255, 0.07) 0%, transparent 40%);
+        }
+
+        .orb {
+            position: fixed;
+            width: 50vw; height: 50vw;
+            border-radius: 50%;
+            background: var(--primary);
+            filter: blur(140px);
+            opacity: 0.12;
+            z-index: -1;
+            pointer-events: none;
+        }
+        .orb-1 { top: -20%; left: -10%; }
+        .orb-2 { bottom: -20%; right: -10%; background: #00d9ff; }
+
+        header { padding: 80px 20px 40px; text-align: center; }
+        
+        h1 {
+            font-size: clamp(2.5rem, 10vw, 5rem);
+            font-weight: 800; margin: 0;
+            letter-spacing: -2px;
+            color: #ffffff;
+            text-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+
+        /* --- SEARCH --- */
+        .search-wrap { width: 90%; max-width: 600px; margin-bottom: 50px; }
+        #moduleSearch {
+            width: 100%; 
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--glass-border);
+            padding: 20px 30px;
+            border-radius: 100px;
+            color: #fff;
+            font-size: 1.1rem;
+            outline: none;
+            backdrop-filter: blur(20px);
+            transition: 0.3s;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+        #moduleSearch:focus { border-color: var(--primary); box-shadow: 0 0 30px var(--primary-glow); }
+
+        /* --- GRID --- */
+        .link-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 20px; width: 90%; max-width: 1200px;
+            padding-bottom: 120px;
+        }
+
+        .game-link {
+            position: relative;
+            text-decoration: none;
+            background: rgba(255, 255, 255, 0.03);
+            height: 140px; /* Slightly taller for score */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 24px;
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(15px);
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        .game-link:hover {
+            transform: translateY(-8px);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--primary);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+        }
+
+        .game-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #ffffff;
+            text-align: center;
+            padding: 0 15px;
+        }
+
+        .high-score-tag {
+            font-size: 0.7rem;
+            opacity: 0.5;
+            margin-top: 8px;
+            font-family: 'Fira Code', monospace;
+            color: var(--primary);
+        }
+
+        .badge {
+            position: absolute;
+            top: 12px; right: 12px;
+            font-size: 0.6rem; font-weight: 800;
+            padding: 4px 10px; border-radius: 50px;
+            background: var(--primary); color: #000;
+            text-transform: uppercase;
+        }
+
+        /* --- ACCOUNT INTERFACE --- */
+        .top-right-nav { position: absolute; top: 30px; right: 30px; display: flex; gap: 10px; }
+        .acc-btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 100px;
+            font-weight: 600;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: 0.3s;
+        }
+        .acc-btn:hover { background: var(--primary); color: #000; }
+        
+        .logout-btn { display: none; background: rgba(255,0,0,0.2); color: #ff4444; border: 1px solid rgba(255,0,0,0.3); }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(12px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .login-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            padding: 40px;
+            border-radius: 32px;
+            width: 90%; max-width: 400px;
+            text-align: center;
+            position: relative;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 15px;
+            margin: 8px 0;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--glass-border);
+            border-radius: 15px;
+            color: #fff;
+            box-sizing: border-box;
+            outline: none;
+        }
+
+        .login-btn {
+            width: 100%; padding: 15px; margin-top: 20px;
+            background: var(--primary);
+            border: none; border-radius: 15px;
+            font-weight: 800; cursor: pointer;
+        }
+
+        .bottom-controls {
+            position: fixed; bottom: 30px; 
+            display: flex; align-items: center; gap: 20px;
+            z-index: 1000;
+        }
+
+        .theme-panel, .support-btn {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 100px;
+        }
+
+        .theme-panel { padding: 12px 24px; display: flex; gap: 15px; }
+        .support-btn { padding: 12px 28px; color: #fff; text-decoration: none; font-size: 0.8rem; font-weight: 700; transition: 0.3s; }
+        .t-btn { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid rgba(255,255,255,0.3); }
+    </style>
+</head>
+<body>
+
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div class="top-right-nav">
+        <button id="userBtn" class="acc-btn" onclick="toggleModal()">JOIN NEBULA</button>
+        <button id="logoutBtn" class="acc-btn logout-btn" onclick="logout()">LOGOUT</button>
+    </div>
+
+    <header>
+        <h1>Nebula</h1>
+        <p style="opacity: 0.6; font-size: 0.8rem; letter-spacing: 4px; text-transform: uppercase;">Cloud Gaming</p>
+    </header>
+
+    <div class="search-wrap">
+        <input type="text" id="moduleSearch" placeholder="Search Games..." onkeyup="filterGames()">
+    </div>
+
+    <div id="stable-container" class="link-container"></div>
+
+    <div id="loginModal" class="modal-overlay">
+        <div class="login-card">
+            <button style="position:absolute; top:20px; right:20px; background:none; border:none; color:#fff; cursor:pointer;" onclick="toggleModal()">&times;</button>
+            <h2>Join Nebula</h2>
+            <p style="opacity:0.6; font-size:0.9rem;">Enter a username to save scores locally.</p>
+            <div class="input-group">
+                <input type="text" id="usernameInput" placeholder="Username">
+            </div>
+            <button class="login-btn" onclick="saveUser()">START GAMING</button>
+        </div>
+    </div>
+
+    <div class="bottom-controls">
+        <div class="theme-panel">
+            <div class="t-btn" style="background:#00ff88" onclick="setTheme('default')"></div>
+            <div class="t-btn" style="background:#ff00ff" onclick="setTheme('cyber')"></div>
+            <div class="t-btn" style="background:#00d9ff" onclick="setTheme('ocean')"></div>
+            <div class="t-btn" style="background:#ffaa00" onclick="setTheme('amber')"></div>
+        </div>
+        <a href="https://forms.office.com/..." target="_blank" class="support-btn">SUPPORT</a>
+    </div>
+
+    <script>
+        const games = [
+            { name: "Neon Cyber Strike", url: "Cyber-Strike.html", tag: "best" },
+            { name: "Blockcraft", url: "blockcraft.html", tag: "upd" },
+            { name: "Minesweeper", url: "minesweeper.html", tag: "best" },
+            { name: "Neon Snake", url: "snake.html", tag: "best" },
+            { name: "Master Armory", url: "masterarmory.html", tag: "best" },
+            { name: "Neon Pong", url: "Neon-Pong.html", tag: "best" },
+            { name: "Neon Slash", url: "Neon-Slash.html", tag: "" },
+            { name: "Block Breaker", url: "blockbreaker.html", tag: "" },
+            { name: "Neon Golf", url: "Neon-Golf.html", tag: "" },
+            { name: "Neon Slamz", url: "Neon-Slams.html", tag: "" },
+            { name: "Neon Trail", url: "neon-trail.html", tag: "" },
+            { name: "Block Blast", url: "blockblast.html", tag: "" },
+            { name: "Neon Run", url: "ai.html", tag: "" },
+            { name: "Basketball", url: "basketball.html", tag: "" },
+            { name: "Football", url: "football.html", tag: "" },
+            { name: "Cricket", url: "cricket.html", tag: "" },
+            { name: "Crossy Roads", url: "crossyroads.html", tag: "" },
+            { name: "Drift", url: "drift.html", tag: "" },
+            { name: "Eggshell (EGGVP)", url: "eggshell.html", tag: "upd" },
+            { name: "Overdrive", url: "overdrive.html", tag: "" },
+            { name: "Pacman", url: "pacman.html", tag: "" },
+            { name: "Space Adventure", url: "spaceadventure.html", tag: "" },
+            { name: "Tic Tac Toe", url: "tictactoe.html", tag: "" },
+            { name: "Turbo Horizon", url: "turbohorizon.html", tag: "" },
+            { name: "Neon Hex", url: "Neon-Hex.html", tag: "" }
+        ];
+
+        function toggleModal() {
+            const modal = document.getElementById('loginModal');
+            modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
+        }
+
+        function saveUser() {
+            const user = document.getElementById('usernameInput').value;
+            if(user) {
+                localStorage.setItem('nebula_user', user);
+                checkUser();
+                toggleModal();
+                buildArcade(); // Refresh to show scores
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('nebula_user');
+            location.reload();
+        }
+
+        function checkUser() {
+            const savedUser = localStorage.getItem('nebula_user');
+            const userBtn = document.getElementById('userBtn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            if(savedUser) {
+                userBtn.innerText = savedUser.toUpperCase();
+                userBtn.onclick = null;
+                logoutBtn.style.display = "block";
+            }
+        }
+
+        function buildArcade() {
+            const container = document.getElementById('stable-container');
+            const savedScores = JSON.parse(localStorage.getItem('nebula_scores')) || {};
+
+            container.innerHTML = games.map(game => {
+                const best = savedScores[game.name] ? `BEST: ${savedScores[game.name]}` : 'NO SCORE';
+                return `
+                    <a href="${game.url}" target="_blank" class="game-link" data-name="${game.name.toLowerCase()}">
+                        ${game.tag ? `<span class="badge">${game.tag}</span>` : ''}
+                        <span class="game-title">${game.name}</span>
+                        <span class="high-score-tag">${best}</span>
+                    </a>
+                `;
+            }).join('');
+        }
+
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            if(theme === 'default') document.documentElement.removeAttribute('data-theme');
+        }
+
+        function filterGames() {
+            const val = document.getElementById('moduleSearch').value.toLowerCase();
+            document.querySelectorAll('.game-link').forEach(el => {
+                el.style.display = el.dataset.name.includes(val) ? 'flex' : 'none';
+            });
+        }
+
+        buildArcade();
+        checkUser();
+    </script>
+</body>
+</html>

@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>NEXUS-3D | NEBULA REMASTER</title>
+<style>
+body { margin:0; background:#000; overflow:hidden; font-family:monospace; color:#0f0; }
+canvas { width:100vw; height:100vh; display:block; }
+
+#hud {
+    position:fixed; bottom:10px; width:100%;
+    display:flex; justify-content:space-around;
+}
+.stat { background:#000; padding:6px 12px; border:1px solid #0f0; }
+
+#menu {
+    position:fixed; width:100%; height:100%;
+    display:flex; justify-content:center; align-items:center;
+    background:#000;
+}
+button { padding:15px; background:#0f0; border:none; cursor:pointer; }
+
+#crosshair {
+    position:fixed;
+    top:50%; left:50%;
+    width:12px; height:12px;
+    transform:translate(-50%,-50%);
+}
+#crosshair::before,#crosshair::after{
+    content:""; position:absolute; background:#0f0;
+}
+#crosshair::before{ width:12px;height:2px;top:5px;}
+#crosshair::after{ width:2px;height:12px;left:5px;}
+</style>
+</head>
+<body>
+
+<div id="menu">
+    <button onclick="start()">ENTER NEBULA</button>
+</div>
+
+<canvas id="game"></canvas>
+<div id="crosshair"></div>
+
+<div id="hud">
+    <div class="stat">HP: <span id="hp">100</span></div>
+    <div class="stat">SCORE: <span id="score">0</span></div>
+    <div class="stat">WEAPON: <span id="weapon">PISTOL</span></div>
+</div>
+
+<script>
+const c = document.getElementById("game");
+const ctx = c.getContext("2d");
+
+let SIZE=31, world=[], active=false;
+let keys={};
+
+let player, bots=[], powerups=[];
+let score=0, weapon="pistol";
+let lastShot=0, recoil=0;
+
+window.onkeydown=e=>{
+    keys[e.code]=true;
+    if(e.code==="Digit1") weapon="pistol";
+    if(e.code==="Digit2") weapon="rapid";
+};
+window.onkeyup=e=>keys[e.code]=false;
+window.onclick=shoot;
+
+function resetPlayer(){
+    player={x:1.5,y:1.5,dir:0,hp:100};
+}
+
+function generateMaze(){
+    world=Array(SIZE).fill().map(()=>Array(SIZE).fill(1));
+    function walk(x,y){
+        world[y][x]=0;
+        [[0,-2],[0,2],[-2,0],[2,0]].sort(()=>Math.random()-0.5)
+        .forEach(([dx,dy])=>{
+            let nx=x+dx, ny=y+dy;
+            if(world[ny] && world[ny][nx]){
+                world[y+dy/2][x+dx/2]=0;
+                walk(nx,ny);
+            }
+        });
+    }
+    walk(1,1);
+}
+
+function canMove(x,y){
+    return world[Math.floor(y)] && world[Math.floor(y)][Math.floor(x)]===0;
+}
+
+function move(){
+    let speed = keys["ShiftLeft"]?0.08:0.05;
+
+    if(keys["KeyA"]) player.dir-=0.05;
+    if(keys["KeyD"]) player.dir+=0.05;
+
+    let mx=0,my=0;
+    if(keys["KeyW"]){ mx+=Math.cos(player.dir)*speed; my+=Math.sin(player.dir)*speed; }
+    if(keys["KeyS"]){ mx-=Math.cos(player.dir)*speed; my-=Math.sin(player.dir)*speed; }
+
+    if(canMove(player.x+mx*1.5,player.y)) player.x+=mx;
+    if(canMove(player.x,player.y+my*1.5)) player.y+=my;
+}
+
+function shoot(){
+    let now=Date.now();
+    let cd = weapon==="rapid"?100:250;
+    if(now-lastShot<cd) return;
+    lastShot=now;
+
+    recoil=5;
+
+    bots.forEach(b=>{
+        let dx=b.x-player.x, dy=b.y-player.y;
+        let dist=Math.hypot(dx,dy);
+        let angle=Math.atan2(dy,dx)-player.dir;
+
+        if(Math.abs(angle)<0.2 && dist<7){
+            b.hp -= weapon==="rapid"?20:50;
+
+            if(b.hp<=0){
+                score+=100;
+                if(Math.random()<0.4) powerups.push({x:b.x,y:b.y});
+                bots=bots.filter(x=>x!==b);
+            }
+        }
+    });
+}
+
+// PATHFINDING
+function nextStep(b){
+    let sx=Math.floor(b.x), sy=Math.floor(b.y);
+    let tx=Math.floor(player.x), ty=Math.floor(player.y);
+
+    let q=[[sx,sy]], visited=new Set([sx+","+sy]), parent={};
+
+    while(q.length){
+        let [cx,cy]=q.shift();
+        if(cx===tx && cy===ty) break;
+
+        [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx,dy])=>{
+            let nx=cx+dx, ny=cy+dy;
+            if(world[ny] && world[ny][nx]==0 && !visited.has(nx+","+ny)){
+                visited.add(nx+","+ny);
+                parent[nx+","+ny]=[cx,cy];
+                q.push([nx,ny]);
+            }
+        });
+    }
+
+    let cur=tx+","+ty;
+    if(!parent[cur]) return b;
+
+    while(parent[cur] && parent[parent[cur].join(",")]){
+        cur=parent[cur].join(",");
+    }
+
+    let [nx,ny]=cur.split(",").map(Number);
+    return {x:nx+0.5,y:ny+0.5};
+}
+
+function updateBots(){
+    bots.forEach(b=>{
+        let dist=Math.hypot(player.x-b.x, player.y-b.y);
+
+        if(dist<0.5){
+            player.hp-=0.5;
+        } else {
+            let n=nextStep(b);
+            let dx=n.x-b.x, dy=n.y-b.y;
+            let d=Math.hypot(dx,dy);
+            if(d>0.01){
+                b.x += (dx/d)*b.speed;
+                b.y += (dy/d)*b.speed;
+            }
+        }
+    });
+}
+
+function render(){
+    c.width=innerWidth;
+    c.height=innerHeight;
+    let w=c.width,h=c.height;
+
+    // SKY
+    let g=ctx.createLinearGradient(0,0,0,h/2);
+    g.addColorStop(0,"#020412");
+    g.addColorStop(1,"#000");
+    ctx.fillStyle=g;
+    ctx.fillRect(0,0,w,h/2);
+
+    ctx.fillStyle="#050505";
+    ctx.fillRect(0,h/2,w,h/2);
+
+    let zBuf=new Array(w).fill(20);
+
+    // WALLS
+    for(let i=0;i<w;i++){
+        let ray=player.dir+(i/w-0.5);
+        let d=0;
+
+        while(d<20){
+            d+=0.03;
+            let x=player.x+Math.cos(ray)*d;
+            let y=player.y+Math.sin(ray)*d;
+
+            if(world[Math.floor(y)] && world[Math.floor(y)][Math.floor(x)]==1){
+                zBuf[i]=d;
+                let hgt=h/d;
+
+                let shade=255-d*20;
+                ctx.fillStyle=`rgb(0,${shade},${shade/2})`;
+                ctx.fillRect(i,h/2-hgt/2,1,hgt);
+                break;
+            }
+        }
+    }
+
+    // ENEMIES
+    bots.forEach(b=>{
+        let dx=b.x-player.x, dy=b.y-player.y;
+        let dist=Math.hypot(dx,dy);
+        let angle=Math.atan2(dy,dx)-player.dir;
+
+        if(Math.abs(angle)<0.7){
+            let sx=(angle/1.4+0.5)*w;
+            let size=h/dist;
+
+            if(dist<zBuf[Math.floor(sx)]){
+                ctx.fillStyle="#ff0033";
+                ctx.fillRect(sx-size/6,h/2-size/2,size/3,size);
+            }
+        }
+    });
+
+    // POWERUPS
+    powerups.forEach(p=>{
+        let dx=p.x-player.x, dy=p.y-player.y;
+        let dist=Math.hypot(dx,dy);
+        let angle=Math.atan2(dy,dx)-player.dir;
+
+        if(Math.abs(angle)<0.7){
+            let sx=(angle/1.4+0.5)*w;
+            let size=h/dist;
+            ctx.fillStyle="#00ffff";
+            ctx.fillRect(sx-size/6,h/2-size/2,size/3,size/2);
+        }
+
+        if(Math.hypot(player.x-p.x,player.y-p.y)<0.5){
+            player.hp=Math.min(100,player.hp+30);
+            powerups=powerups.filter(x=>x!==p);
+        }
+    });
+
+    // DAMAGE
+    if(player.hp<30){
+        ctx.fillStyle="rgba(255,0,0,0.25)";
+        ctx.fillRect(0,0,w,h);
+    }
+
+    // WEAPON
+    recoil*=0.85;
+    ctx.fillStyle="#0f0";
+    ctx.fillRect(w/2-20+recoil*5,h-100,40,60);
+}
+
+function loop(){
+    if(!active) return;
+
+    move();
+    updateBots();
+
+    if(player.hp<=0){
+        score=Math.max(0,score-200);
+        resetPlayer();
+    }
+
+    render();
+
+    document.getElementById("hp").innerText=Math.floor(player.hp);
+    document.getElementById("score").innerText=score;
+    document.getElementById("weapon").innerText=weapon.toUpperCase();
+
+    requestAnimationFrame(loop);
+}
+
+function start(){
+    document.getElementById("menu").style.display="none";
+    generateMaze();
+    resetPlayer();
+    active=true;
+
+    bots=[];
+    for(let i=0;i<4;i++) bots.push({x:Math.random()*SIZE,y:Math.random()*SIZE,hp:100,speed:0.02});
+
+    setInterval(()=>bots.push({x:Math.random()*SIZE,y:Math.random()*SIZE,hp:100,speed:0.02}),6000);
+
+    loop();
+}
+</script>
+
+</body>
+</html>

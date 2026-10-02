@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Bot Arena X</title>
+
+<style>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Arial,sans-serif;
+}
+
+body{
+overflow:hidden;
+background:black;
+}
+
+canvas{
+display:block;
+background:
+radial-gradient(circle at center,#111 0%,#050505 60%,black 100%);
+}
+
+#ui{
+position:absolute;
+top:10px;
+left:10px;
+color:white;
+z-index:10;
+font-size:20px;
+}
+
+#ui div{
+margin-bottom:8px;
+}
+
+#start{
+position:absolute;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+background:#111;
+padding:25px;
+border:2px solid cyan;
+color:white;
+text-align:center;
+border-radius:10px;
+box-shadow:0 0 20px cyan;
+}
+
+button{
+padding:10px 20px;
+border:none;
+background:cyan;
+color:black;
+font-weight:bold;
+cursor:pointer;
+border-radius:8px;
+margin-top:10px;
+}
+
+button:hover{
+transform:scale(1.05);
+}
+
+</style>
+</head>
+<body>
+
+<div id="ui">
+<div>Score: <span id="score">0</span></div>
+<div>Health: <span id="health">100</span></div>
+<div>Wave: <span id="wave">1</span></div>
+</div>
+
+<div id="start">
+<h1>BOT ARENA X</h1>
+<p>WASD or Arrow Keys to move</p>
+<p>SPACE = Dash</p>
+<button onclick="startGame()">Start Game</button>
+</div>
+
+<canvas id="game"></canvas>
+
+<script>
+
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+
+const scoreEl=document.getElementById("score");
+const healthEl=document.getElementById("health");
+const waveEl=document.getElementById("wave");
+
+let gameStarted=false;
+
+const keys={};
+
+const player={
+x:canvas.width/2,
+y:canvas.height/2,
+r:20,
+speed:6,
+dx:0,
+dy:0,
+health:100,
+score:0,
+boost:0
+};
+
+let bots=[];
+let cores=[];
+let particles=[];
+let powerups=[];
+
+let wave=1;
+
+function random(min,max){
+return Math.random()*(max-min)+min;
+}
+
+function spawnBot(){
+
+let side=Math.floor(Math.random()*4);
+
+let x,y;
+
+if(side===0){
+x=-40;
+y=random(0,canvas.height);
+}
+
+if(side===1){
+x=canvas.width+40;
+y=random(0,canvas.height);
+}
+
+if(side===2){
+x=random(0,canvas.width);
+y=-40;
+}
+
+if(side===3){
+x=random(0,canvas.width);
+y=canvas.height+40;
+}
+
+bots.push({
+x,
+y,
+r:18,
+speed:1.5+wave*0.15
+});
+
+}
+
+function spawnCore(){
+
+cores.push({
+x:random(50,canvas.width-50),
+y:random(50,canvas.height-50),
+r:10,
+spin:0
+});
+
+}
+
+function spawnPower(){
+
+powerups.push({
+x:random(50,canvas.width-50),
+y:random(50,canvas.height-50),
+r:15,
+type:Math.random()>0.5?"heal":"boost",
+spin:0
+});
+
+}
+
+function createParticles(x,y,color){
+
+for(let i=0;i<20;i++){
+
+particles.push({
+x,
+y,
+dx:random(-5,5),
+dy:random(-5,5),
+life:1,
+color
+});
+
+}
+
+}
+
+for(let i=0;i<5;i++) spawnCore();
+
+for(let i=0;i<2;i++) spawnPower();
+
+function startGame(){
+
+document.getElementById("start").style.display="none";
+
+gameStarted=true;
+
+for(let i=0;i<3;i++) spawnBot();
+
+}
+
+window.addEventListener("keydown",e=>{
+
+keys[e.key]=true;
+
+if(e.code==="Space"){
+
+player.dx*=2;
+player.dy*=2;
+
+createParticles(player.x,player.y,"cyan");
+
+}
+
+});
+
+window.addEventListener("keyup",e=>{
+
+keys[e.key]=false;
+
+});
+
+function movePlayer(){
+
+let speed=player.boost>0?10:6;
+
+if(keys["w"]||keys["ArrowUp"]) player.y-=speed;
+if(keys["s"]||keys["ArrowDown"]) player.y+=speed;
+if(keys["a"]||keys["ArrowLeft"]) player.x-=speed;
+if(keys["d"]||keys["ArrowRight"]) player.x+=speed;
+
+player.x=Math.max(player.r,Math.min(canvas.width-player.r,player.x));
+player.y=Math.max(player.r,Math.min(canvas.height-player.r,player.y));
+
+if(player.boost>0) player.boost--;
+
+}
+
+function updateBots(){
+
+bots.forEach(bot=>{
+
+let angle=Math.atan2(player.y-bot.y,player.x-bot.x);
+
+bot.x+=Math.cos(angle)*bot.speed;
+bot.y+=Math.sin(angle)*bot.speed;
+
+let dist=Math.hypot(player.x-bot.x,player.y-bot.y);
+
+if(dist<player.r+bot.r){
+
+player.health-=0.3;
+
+createParticles(player.x,player.y,"red");
+
+}
+
+});
+
+}
+
+function updateCores(){
+
+cores.forEach((core,index)=>{
+
+core.spin+=0.05;
+
+let dist=Math.hypot(player.x-core.x,player.y-core.y);
+
+if(dist<player.r+core.r){
+
+player.score++;
+
+scoreEl.textContent=player.score;
+
+createParticles(core.x,core.y,"yellow");
+
+cores.splice(index,1);
+
+spawnCore();
+
+if(player.score%10===0){
+
+wave++;
+
+waveEl.textContent=wave;
+
+spawnBot();
+spawnBot();
+
+}
+
+}
+
+});
+
+}
+
+function updatePowerups(){
+
+powerups.forEach((p,index)=>{
+
+p.spin+=0.05;
+
+let dist=Math.hypot(player.x-p.x,player.y-p.y);
+
+if(dist<player.r+p.r){
+
+if(p.type==="heal"){
+
+player.health=Math.min(100,player.health+30);
+
+}
+
+if(p.type==="boost"){
+
+player.boost=300;
+
+}
+
+createParticles(p.x,p.y,p.type==="heal"?"lime":"cyan");
+
+powerups.splice(index,1);
+
+setTimeout(spawnPower,7000);
+
+}
+
+});
+
+}
+
+function updateParticles(){
+
+particles.forEach((p,index)=>{
+
+p.x+=p.dx;
+p.y+=p.dy;
+
+p.life-=0.02;
+
+if(p.life<=0){
+
+particles.splice(index,1);
+
+}
+
+});
+
+}
+
+function drawPlayer(){
+
+ctx.beginPath();
+ctx.arc(player.x,player.y,player.r,0,Math.PI*2);
+ctx.fillStyle=player.boost>0?"cyan":"white";
+ctx.shadowBlur=25;
+ctx.shadowColor=player.boost>0?"cyan":"white";
+ctx.fill();
+
+}
+
+function drawBots(){
+
+bots.forEach(bot=>{
+
+ctx.beginPath();
+ctx.rect(bot.x-bot.r,bot.y-bot.r,bot.r*2,bot.r*2);
+ctx.fillStyle="red";
+ctx.shadowBlur=20;
+ctx.shadowColor="red";
+ctx.fill();
+
+});
+
+}
+
+function drawCores(){
+
+cores.forEach(core=>{
+
+ctx.save();
+
+ctx.translate(core.x,core.y);
+
+ctx.rotate(core.spin);
+
+ctx.beginPath();
+
+for(let i=0;i<6;i++){
+
+let angle=i*Math.PI/3;
+
+let r=i%2===0?16:8;
+
+let x=Math.cos(angle)*r;
+let y=Math.sin(angle)*r;
+
+if(i===0) ctx.moveTo(x,y);
+else ctx.lineTo(x,y);
+
+}
+
+ctx.closePath();
+
+ctx.strokeStyle="yellow";
+ctx.lineWidth=3;
+ctx.shadowBlur=20;
+ctx.shadowColor="yellow";
+ctx.stroke();
+
+ctx.restore();
+
+});
+
+}
+
+function drawPowerups(){
+
+powerups.forEach(p=>{
+
+ctx.save();
+
+ctx.translate(p.x,p.y);
+
+ctx.rotate(p.spin);
+
+ctx.beginPath();
+
+ctx.rect(-12,-12,24,24);
+
+ctx.strokeStyle=p.type==="heal"?"lime":"cyan";
+
+ctx.lineWidth=4;
+
+ctx.shadowBlur=20;
+
+ctx.shadowColor=p.type==="heal"?"lime":"cyan";
+
+ctx.stroke();
+
+ctx.restore();
+
+});
+
+}
+
+function drawParticles(){
+
+particles.forEach(p=>{
+
+ctx.globalAlpha=p.life;
+
+ctx.beginPath();
+
+ctx.arc(p.x,p.y,3,0,Math.PI*2);
+
+ctx.fillStyle=p.color;
+
+ctx.fill();
+
+ctx.globalAlpha=1;
+
+});
+
+}
+
+function gameOver(){
+
+ctx.fillStyle="rgba(0,0,0,0.7)";
+ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ctx.fillStyle="white";
+ctx.font="60px Arial";
+ctx.textAlign="center";
+ctx.fillText("GAME OVER",canvas.width/2,canvas.height/2);
+
+ctx.font="30px Arial";
+ctx.fillText(
+"Final Score: "+player.score,
+canvas.width/2,
+canvas.height/2+60
+);
+
+gameStarted=false;
+
+}
+
+function update(){
+
+if(!gameStarted) return;
+
+ctx.clearRect(0,0,canvas.width,canvas.height);
+
+movePlayer();
+
+updateBots();
+
+updateCores();
+
+updatePowerups();
+
+updateParticles();
+
+drawCores();
+
+drawPowerups();
+
+drawBots();
+
+drawPlayer();
+
+drawParticles();
+
+healthEl.textContent=Math.floor(player.health);
+
+if(player.health<=0){
+
+gameOver();
+
+return;
+
+}
+
+requestAnimationFrame(update);
+
+}
+
+update();
+
+window.addEventListener("resize",()=>{
+
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+
+});
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NEBULA | SMOOTH PHYSICS</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; }
+        #ui { position: absolute; top: 20px; left: 20px; color: white; text-shadow: 2px 2px 4px #000; pointer-events: none; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); mix-blend-mode: difference; }
+        #hotbar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 10px; }
+        .slot { width: 40px; height: 40px; border: 2px solid #777; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; }
+        .slot.active { border-color: #00ff88; box-shadow: 0 0 10px #00ff88; }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <b>NEBULA V6</b><br>
+    FPS: <span id="fps">0</span> | POS: <span id="pos">0,0,0</span><br>
+    <small>SHIFT: Sprint | SPACE: Jump | 1-5: Blocks</small>
+</div>
+
+<div id="hotbar">
+    <div id="s1" class="slot active">GRASS</div>
+    <div id="s2" class="slot">STONE</div>
+    <div id="s3" class="slot">DIRT</div>
+    <div id="s4" class="slot">WOOD</div>
+    <div id="s5" class="slot">GLASS</div>
+</div>
+
+<div id="crosshair"></div>
+
+<script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+
+    // --- CONFIG ---
+    const worldData = {};
+    const CHUNK_SIZE = 16;
+    const RENDER_DIST = 2;
+    const PLAYER_RADIUS = 0.35;
+    const STEP_HEIGHT = 0.6; // Allows walking up 1 block
+    
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87CEEB);
+    scene.fog = new THREE.Fog(0x87CEEB, 10, 50);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(1); // Force 1:1 pixel ratio to reduce lag
+    document.body.appendChild(renderer.domElement);
+
+    const light = new THREE.AmbientLight(0xffffff, 0.8);
+    const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+    sun.position.set(5, 10, 7);
+    scene.add(light, sun);
+
+    const materials = {
+        grass: new THREE.MeshLambertMaterial({ color: 0x559955 }),
+        stone: new THREE.MeshLambertMaterial({ color: 0x888888 }),
+        dirt: new THREE.MeshLambertMaterial({ color: 0x664422 }),
+        wood: new THREE.MeshLambertMaterial({ color: 0x553311 }),
+        glass: new THREE.MeshLambertMaterial({ color: 0xaaddff, transparent: true, opacity: 0.5 })
+    };
+    const cubeGeo = new THREE.BoxGeometry(1, 1, 1);
+    const chunkMeshes = new Map();
+
+    // --- PHYSICS HELPERS ---
+    function isBlockAt(x, y, z) {
+        return worldData[`${Math.round(x)},${Math.round(y)},${Math.round(z)}`] ? true : false;
+    }
+
+    // --- GENERATION ---
+    function generateChunk(cx, cz) {
+        const key = `${cx},${cz}`;
+        if (chunkMeshes.has(key)) return;
+
+        const group = new THREE.Group();
+        for (let x = 0; x < CHUNK_SIZE; x++) {
+            for (let z = 0; z < CHUNK_SIZE; z++) {
+                const wx = cx * CHUNK_SIZE + x;
+                const wz = cz * CHUNK_SIZE + z;
+                const h = Math.floor(Math.sin(wx * 0.1) * 2 + Math.cos(wz * 0.1) * 2 + 8);
+                
+                for (let y = 0; y <= h; y++) {
+                    const type = (y === h) ? 'grass' : (y > h - 3) ? 'dirt' : 'stone';
+                    const blockKey = `${wx},${y},${wz}`;
+                    worldData[blockKey] = type;
+
+                    // Optimization: Only render blocks that could be visible (surface)
+                    if (y === h) {
+                        const mesh = new THREE.Mesh(cubeGeo, materials[type]);
+                        mesh.position.set(wx, y, wz);
+                        group.add(mesh);
+                    }
+                }
+            }
+        }
+        scene.add(group);
+        chunkMeshes.set(key, group);
+    }
+
+    // --- PLAYER CONTROLS & PHYSICS ---
+    let velocity = new THREE.Vector3();
+    let keys = {};
+    let canJump = false;
+
+    document.addEventListener('keydown', (e) => { keys[e.code] = true; if(e.key >= 1 && e.key <= 5) setSlot(e.key); });
+    document.addEventListener('keyup', (e) => keys[e.code] = false);
+    document.body.onclick = () => document.body.requestPointerLock();
+
+    function setSlot(n) {
+        document.querySelectorAll('.slot').forEach(s => s.classList.remove('active'));
+        document.getElementById('s'+n).classList.add('active');
+    }
+
+    camera.position.set(8, 15, 8);
+    camera.rotation.order = 'YXZ';
+
+    function update(delta) {
+        if (!document.pointerLockElement) return;
+
+        // Gravity
+        velocity.y -= 20 * delta;
+
+        // Rotation
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement) {
+                camera.rotation.y -= e.movementX * 0.002;
+                camera.rotation.x -= e.movementY * 0.002;
+                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+            }
+        }, { once: true });
+
+        // Movement
+        const speed = keys['ShiftLeft'] ? 10 : 5;
+        const moveDir = new THREE.Vector3();
+        if (keys['KeyW']) moveDir.z -= 1;
+        if (keys['KeyS']) moveDir.z += 1;
+        if (keys['KeyA']) moveDir.x -= 1;
+        if (keys['KeyD']) moveDir.x += 1;
+        moveDir.applyQuaternion(camera.quaternion);
+        moveDir.y = 0;
+        moveDir.normalize();
+
+        velocity.x = moveDir.x * speed;
+        velocity.z = moveDir.z * speed;
+
+        // Collision Logic
+        let nextX = camera.position.x + velocity.x * delta;
+        let nextZ = camera.position.z + velocity.z * delta;
+        let nextY = camera.position.y + velocity.y * delta;
+
+        // 1. Step-Up / Floor Collision
+        const floorY = Math.round(nextY - 1.6);
+        if (isBlockAt(nextX, floorY, nextZ)) {
+            // Check if we can step up
+            if (!isBlockAt(nextX, floorY + 1, nextZ)) {
+                nextY = floorY + 1 + 1.6;
+                velocity.y = 0;
+                canJump = true;
+            } else {
+                // Wall hit
+                nextX = camera.position.x;
+                nextZ = camera.position.z;
+            }
+        } else {
+            canJump = false;
+        }
+
+        // 2. Jumping
+        if (keys['Space'] && canJump) {
+            velocity.y = 8;
+            canJump = false;
+        }
+
+        camera.position.set(nextX, nextY, nextZ);
+
+        // Infinite Generation
+        const cx = Math.floor(camera.position.x / CHUNK_SIZE);
+        const cz = Math.floor(camera.position.z / CHUNK_SIZE);
+        for(let x=-RENDER_DIST; x<=RENDER_DIST; x++) {
+            for(let z=-RENDER_DIST; z<=RENDER_DIST; z++) {
+                generateChunk(cx+x, cz+z);
+            }
+        }
+
+        document.getElementById('pos').innerText = `${Math.round(camera.position.x)}, ${Math.round(camera.position.y)}, ${Math.round(camera.position.z)}`;
+    }
+
+    // --- LOOP ---
+    let lastTime = performance.now();
+    function animate() {
+        requestAnimationFrame(animate);
+        const now = performance.now();
+        const delta = Math.min((now - lastTime) / 1000, 0.1);
+        lastTime = now;
+
+        update(delta);
+        renderer.render(scene, camera);
+        document.getElementById('fps').innerText = Math.round(1/delta);
+    }
+    animate();
+</script>
+</body>
+</html>

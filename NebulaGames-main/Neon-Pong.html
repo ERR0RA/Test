@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEON_PONG | v4.0_OPEN</title>
+    <style>
+        :root { 
+            --neon: #0f0; --alpha: #0ff; --neon-p: #f0f; --king: #ff3333;
+            --bg: #050508; --glass: rgba(0, 20, 0, 0.9);
+        }
+        * { box-sizing: border-box; touch-action: none; user-select: none; }
+        body { 
+            background: var(--bg); color: var(--neon); font-family: 'Courier New', monospace; 
+            margin: 0; overflow: hidden; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; height: 100vh;
+        }
+
+        /* CRT & Scanline Overlay */
+        body::after {
+            content: ""; position: absolute; inset: 0; pointer-events: none;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
+                        linear-gradient(90deg, rgba(255,0,0,0.03), rgba(0,255,0,0.01), rgba(0,0,255,0.03));
+            background-size: 100% 3px, 3px 100%; z-index: 100;
+        }
+
+        /* --- GAME UI --- */
+        canvas { 
+            background: #000; display: none; width: 100%; height: auto; 
+            max-height: 75vh; border: 1px solid #111;
+        }
+        #ui { 
+            position: absolute; top: 10px; display: none; z-index: 50; 
+            font-weight: bold; font-size: 1.5rem; letter-spacing: 5px;
+        }
+        
+        .menu { 
+            text-align: center; border: 1px solid var(--neon); padding: 25px; 
+            background: var(--glass); width: 95%; max-width: 900px; z-index: 20;
+            max-height: 90vh; overflow-y: auto;
+        }
+        .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .panel { border: 1px solid rgba(255,255,255,0.1); padding: 10px; background: rgba(0,0,0,0.5); }
+        
+        button { 
+            background: var(--neon); color: #000; border: none; padding: 15px; 
+            width: 100%; cursor: pointer; font-weight: bold; font-family: monospace;
+        }
+
+        /* --- ADMIN PANEL --- */
+        #admin-panel {
+            position: fixed; bottom: 10px; right: 10px; font-size: 10px;
+            background: #000; border: 1px solid red; padding: 5px; display: none;
+        }
+        .admin-table { width: 100%; font-size: 12px; border-collapse: collapse; margin-top: 10px; }
+        .admin-table td { border: 1px solid #222; padding: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <span id="s1" style="color:var(--alpha)">0</span> : <span id="s2" style="color:var(--neon-p)">0</span>
+    </div>
+
+    <div id="menu" class="menu">
+        <h1>SYSTEM_OVERLOAD_v4</h1>
+        <div class="config-grid">
+            <div class="panel">
+                <h4 style="color:var(--neon)">SIM_MODE</h4>
+                <select id="gameMode" style="width:100%; padding:10px; background:#000; color:#fff;">
+                    <option value="STD">STANDARD_BATTLE</option>
+                    <option value="SURVIVAL">HELL_SURVIVAL</option>
+                    <option value="BOSS">KING_CORE_1v4</option>
+                </select>
+            </div>
+            <div class="panel">
+                <h4 style="color:var(--alpha)">LEFT_TEAM</h4>
+                <select id="L1" class="bot-opt"></select>
+                <select id="L2" class="bot-opt"></select>
+            </div>
+            <div class="panel">
+                <h4 style="color:var(--neon-p)">RIGHT_TEAM</h4>
+                <select id="R1" class="bot-opt"></select>
+                <select id="R2" class="bot-opt"></select>
+            </div>
+        </div>
+        <button onclick="Core.init()">INITIALIZE SYSTEM</button>
+        <div id="admin-trigger" style="margin-top:10px; color:red; cursor:pointer;" onclick="System.toggleAdmin()">[ADMIN_TOOLS]</div>
+    </div>
+
+    <canvas id="pong" width="1200" height="600"></canvas>
+
+    <div id="admin-panel">
+        <div style="color:red; font-weight:bold;">MASTER_REGISTRY (BYPASSED)</div>
+        <p>Login system disabled. All permissions active.</p>
+    </div>
+
+<script>
+    // Simplified System Object
+    const System = {
+        currentUser: 'admin',
+        
+        toggleAdmin() {
+            const panel = document.getElementById('admin-panel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+    };
+
+    const canvas = document.getElementById('pong');
+    const ctx = canvas.getContext('2d');
+    let score = { p1: 0, p2: 0 }, touch = { L: null, R: null }, keys = {};
+    let active = false, units = [], balls = [], particles = [], frame = 0;
+
+    const BOT_TYPES = {
+        ALPHA:  { speed: 12.5, jitter: 0, color: '#00ffff', h: 80, predict: true },
+        NEON:   { speed: 18, jitter: 5, color: '#ff00ff', h: 65, predict: true },
+        BETA:   { speed: 7.5, jitter: 15, color: '#00aa66', h: 85, predict: true },
+        OMNI:   { speed: 9, jitter: 2, color: '#0f0', h: 80, predict: true },
+        TANK:   { speed: 5, jitter: 0, color: '#0cf', h: 180, predict: false },
+        KING:   { speed: 14, jitter: 0, color: '#f33', h: 360, predict: true },
+        PLAYER: { speed: 13, jitter: 0, color: '#fff', h: 80, predict: false }
+    };
+
+    // Populate Menus
+    document.querySelectorAll('.bot-opt').forEach(sel => {
+        Object.keys(BOT_TYPES).forEach(k => { if(k!=='KING') sel.add(new Option(k+(k==='PLAYER'?'_USER':'_BOT'), k)); });
+        if(sel.id.includes('2')) { sel.prepend(new Option("--EMPTY--", "NONE")); sel.value = "NONE"; }
+    });
+
+    // Mobile/Input Listeners
+    window.onkeydown = e => keys[e.code] = true;
+    window.onkeyup = e => keys[e.code] = false;
+    canvas.addEventListener('touchstart', e => handleTouch(e), {passive:false});
+    canvas.addEventListener('touchmove', e => handleTouch(e), {passive:false});
+    canvas.addEventListener('touchend', () => { touch = {L:null, R:null} });
+
+    function handleTouch(e) {
+        e.preventDefault();
+        const r = canvas.getBoundingClientRect();
+        for(let t of e.touches) {
+            let x = (t.clientX - r.left) / r.width * 1200;
+            let y = (t.clientY - r.top) / r.height * 600;
+            if(x < 600) touch.L = y; else touch.R = y;
+        }
+    }
+
+    const Core = {
+        init() {
+            units = []; balls = []; particles = [];
+            const mode = document.getElementById('gameMode').value;
+            const config = { 
+                L: [document.getElementById('L1').value, document.getElementById('L2').value],
+                R: [document.getElementById('R1').value, document.getElementById('R2').value]
+            };
+
+            if(mode === "BOSS") {
+                units.push({ x: 1140, y: 120, side: 'R', type: 'KING', h: 360, w: 30, speed: 5, color: '#f33', id: 'BOSS' });
+                config.L.forEach((t, i) => { if(t!=='NONE') this.addUnit(t, 'L', i); });
+            } else {
+                ['L','R'].forEach(s => config[s].forEach((t,i) => { if(t!=='NONE') this.addUnit(t, s, i); }));
+            }
+
+            document.getElementById('menu').style.display = 'none';
+            document.getElementById('ui').style.display = 'block';
+            canvas.style.display = 'block';
+            active = true;
+            this.spawn();
+            this.loop();
+        },
+
+        addUnit(t, side, idx) {
+            const x = side === 'L' ? (idx === 0 ? 30 : 250) : (idx === 0 ? 1155 : 930);
+            units.push({ x, y: 250, side, type: t, h: BOT_TYPES[t].h, w: 15, speed: BOT_TYPES[t].speed, color: BOT_TYPES[t].color, id: side+idx });
+        },
+
+        spawn() {
+            let s = 10 + (score.p1 + score.p2) * 0.3;
+            balls.push({ x: 600, y: 300, vx: Math.random()>0.5?s:-s, vy: (Math.random()-0.5)*10, size: 12, speed: s });
+        },
+
+        predict(u, b) {
+            if(!BOT_TYPES[u.type].predict) return b.y;
+            if((u.side==='L' && b.vx>0) || (u.side==='R' && b.vx<0)) {
+                return u.id.includes('0') ? 200 : 400;
+            }
+            let tx = b.x, ty = b.y, tvy = b.vy;
+            while(u.side==='L' ? tx > u.x : tx < u.x) {
+                tx += b.vx; ty += tvy;
+                if(ty <= 0 || ty >= 590) tvy *= -1;
+            }
+            return ty;
+        },
+
+        update() {
+            frame++;
+            if(frame % 3 === 0) particles.push({x:1200, y:Math.random()*600, vx:-2, vy:0, life:1, star:true});
+
+            units.forEach(u => {
+                if(u.type === 'PLAYER') {
+                    if(u.side==='L') {
+                        if(keys['KeyW'] || (touch.L && touch.L < u.y+u.h/2)) u.y -= u.speed;
+                        if(keys['KeyS'] || (touch.L && touch.L > u.y+u.h/2)) u.y += u.speed;
+                    } else {
+                        if(keys['ArrowUp'] || (touch.R && touch.R < u.y+u.h/2)) u.y -= u.speed;
+                        if(keys['ArrowDown'] || (touch.R && touch.R > u.y+u.h/2)) u.y += u.speed;
+                    }
+                } else {
+                    let target = this.predict(u, balls[0]);
+                    let jitter = (Math.random()-0.5) * (BOT_TYPES[u.type].jitter || 0);
+                    let spd = units.some(x=>x.type==='KING') ? u.speed * 1.2 : u.speed;
+                    if(u.y+u.h/2 < target+jitter) u.y += spd;
+                    else if(u.y+u.h/2 > target+jitter) u.y -= spd;
+                }
+                u.y = Math.max(0, Math.min(600-u.h, u.y));
+            });
+
+            balls.forEach(b => {
+                b.x += b.vx; b.y += b.vy;
+                if(b.y<=0 || b.y>=590) b.vy *= -1;
+                units.forEach(u => {
+                    if(b.x < u.x+u.w && b.x+b.size > u.x && b.y < u.y+u.h && b.y+b.size > u.y) {
+                        b.vx = (u.side==='L'?1:-1) * Math.abs(b.speed);
+                        b.vy = (b.y - (u.y+u.h/2)) * 0.4;
+                        b.speed += 0.4;
+                        for(let i=0; i<5; i++) particles.push({x:b.x, y:b.y, vx:-b.vx/2, vy:(Math.random()-0.5)*10, life:0.5, color:u.color});
+                    }
+                });
+                if(b.x < 0) { score.p2++; this.reset(); }
+                if(b.x > 1200) { score.p1++; this.reset(); }
+            });
+
+            particles.forEach((p,i) => { p.x += p.vx; p.y += p.vy; p.life -= 0.02; if(p.life<=0) particles.splice(i,1); });
+        },
+
+        reset() {
+            balls = []; this.spawn();
+            document.getElementById('s1').innerText = score.p1;
+            document.getElementById('s2').innerText = score.p2;
+        },
+
+        draw() {
+            ctx.fillStyle = '#000'; ctx.fillRect(0,0,1200,600);
+            
+            particles.forEach(p => {
+                ctx.fillStyle = p.star ? `rgba(255,255,255,${p.life})` : p.color;
+                ctx.fillRect(p.x, p.y, p.star?1:3, p.star?1:3);
+            });
+
+            units.forEach(u => {
+                ctx.shadowBlur = (u.type==='KING' || u.type==='ALPHA') ? 30 : 10;
+                ctx.shadowColor = u.color; ctx.fillStyle = u.color;
+                ctx.fillRect(u.x, u.y, u.w, u.h);
+                if(u.type==='KING') {
+                    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+                    let p = Math.sin(frame/10)*5;
+                    ctx.strokeRect(u.x-p, u.y-p, u.w+p*2, u.h+p*2);
+                }
+            });
+
+            balls.forEach(b => {
+                ctx.shadowBlur = 15; ctx.shadowColor = '#fff'; ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(b.x+b.size/2, b.y+b.size/2, b.size/2, 0, Math.PI*2); ctx.fill();
+            });
+            ctx.shadowBlur = 0;
+        },
+
+        loop() { if(!active) return; this.update(); this.draw(); requestAnimationFrame(() => this.loop()); }
+    };
+</script>
+</body>
+</html>

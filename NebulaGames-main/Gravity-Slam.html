@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEON OVERDRIVE: PRO</title>
+    <style>
+        :root { --p1-color: #00d4ff; --p2-color: #ff0055; }
+        body {
+            margin: 0; background: #050505; color: white;
+            font-family: 'Arial Black', sans-serif; overflow: hidden;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh;
+        }
+        #menu {
+            position: absolute; z-index: 10; text-align: center;
+            background: rgba(0,0,0,0.95); padding: 40px; border-radius: 20px;
+            border: 2px solid #333; box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+        .scoreboard {
+            position: absolute; top: 15px; display: none; font-size: 3rem; gap: 80px;
+            z-index: 5; pointer-events: none; text-shadow: 0 0 20px currentColor;
+        }
+        button {
+            display: block; width: 280px; margin: 15px auto; padding: 15px;
+            background: #111; color: #fff; border: 2px solid #444;
+            cursor: pointer; font-size: 1rem; border-radius: 10px; transition: 0.2s;
+        }
+        button:hover { background: #222; border-color: var(--p1-color); }
+        canvas { background: #000; border: 4px solid #222; display: none; touch-action: none; cursor: none; }
+    </style>
+</head>
+<body>
+
+    <div id="score-bar" class="scoreboard">
+        <span style="color: var(--p2-color)" id="s2">0</span>
+        <span style="color: var(--p1-color)" id="s1">0</span>
+    </div>
+
+    <div id="menu">
+        <h1 style="color: var(--p1-color);">NEON OVERDRIVE</h1>
+        <button onclick="boot('P_VS_B')">PLAYER VS BOT</button>
+        <button onclick="boot('B_VS_B')">BOT VS BOT</button>
+        <p style="font-size: 0.8rem; color: #666;">MOVE MOUSE OR TOUCH TO CONTROL</p>
+    </div>
+
+    <canvas id="stage"></canvas>
+
+<script>
+    const canvas = document.getElementById('stage');
+    const ctx = canvas.getContext('2d');
+    const menu = document.getElementById('menu');
+    const scoreBar = document.getElementById('score-bar');
+
+    let p1Score = 0, p2Score = 0;
+    let currentMode = '';
+    const players = [];
+    const ball = { x: 0, y: 0, r: 14, vx: 0, vy: 0 };
+
+    function boot(m) {
+        currentMode = m;
+        menu.style.display = 'none';
+        canvas.style.display = 'block';
+        scoreBar.style.display = 'flex';
+        canvas.width = 500;
+        canvas.height = 700;
+        spawn();
+        requestAnimationFrame(loop);
+    }
+
+    class Striker {
+        constructor(x, y, color, type, side) {
+            this.x = x; this.y = y; this.r = 30;
+            this.color = color; this.type = type; this.side = side;
+            this.targetX = x; this.targetY = y;
+            this.vx = 0; this.vy = 0;
+        }
+
+        update() {
+            let prevX = this.x, prevY = this.y;
+
+            if (this.type === 'mouse') {
+                // Smooth player follow
+                this.x += (this.targetX - this.x) * 0.4;
+                this.y += (this.targetY - this.y) * 0.4;
+            } else {
+                // BOT AI
+                let reactionSpeed = 0.12;
+                let targetX = ball.x;
+                let targetY = ball.y;
+
+                // Repositioning if ball is behind
+                if (this.side === 'top' && ball.y < this.y) targetY = ball.y - 40;
+                if (this.side === 'bottom' && ball.y > this.y) targetY = ball.y + 40;
+                
+                this.x += (targetX - this.x) * reactionSpeed;
+                
+                let homeY = (this.side === 'top') ? 80 : 620;
+                // Only attack if ball is on bot's side of the court
+                const onMySide = (this.side === 'top' && ball.y < 350) || (this.side === 'bottom' && ball.y > 350);
+                
+                if (onMySide) {
+                    this.y += (targetY - this.y) * reactionSpeed;
+                } else {
+                    this.y += (homeY - this.y) * 0.05;
+                }
+            }
+
+            // Constrain to arena and sides
+            this.x = Math.max(this.r, Math.min(canvas.width - this.r, this.x));
+            if (this.side === 'top') {
+                this.y = Math.max(this.r, Math.min(345 - this.r, this.y));
+            } else {
+                this.y = Math.max(355 + this.r, Math.min(canvas.height - this.r, this.y));
+            }
+
+            this.vx = this.x - prevX;
+            this.vy = this.y - prevY;
+        }
+
+        draw() {
+            ctx.shadowBlur = 15; ctx.shadowColor = this.color;
+            ctx.fillStyle = this.color;
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI*2); ctx.fill();
+            
+            // Inner circle detail
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.r * 0.7, 0, Math.PI*2); ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    function spawn() {
+        players.length = 0;
+        ball.x = canvas.width/2; ball.y = canvas.height/2;
+        // Random starting direction
+        ball.vx = (Math.random()-0.5)*8; 
+        ball.vy = (Math.random() > 0.5 ? 5 : -5);
+        
+        if (currentMode === 'P_VS_B') {
+            players.push(new Striker(250, 600, '#00d4ff', 'mouse', 'bottom'));
+            players.push(new Striker(250, 100, '#ff0055', 'bot', 'top'));
+        } else {
+            players.push(new Striker(250, 600, '#00d4ff', 'bot', 'bottom'));
+            players.push(new Striker(250, 100, '#ff0055', 'bot', 'top'));
+        }
+    }
+
+    // Controls
+    function handleMove(e) {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        
+        players.forEach(p => { 
+            if(p.type === 'mouse') { 
+                p.targetX = (clientX - rect.left) * (canvas.width / rect.width); 
+                p.targetY = (clientY - rect.top) * (canvas.height / rect.height); 
+            }
+        });
+    }
+
+    canvas.addEventListener('mousemove', handleMove);
+    canvas.addEventListener('touchmove', handleMove, {passive: false});
+
+    function loop() {
+        // Clear with trail effect
+        ctx.fillStyle = 'rgba(5, 5, 5, 0.2)';
+        ctx.fillRect(0,0,canvas.width, canvas.height);
+
+        // Visual Center line
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(0, 350); ctx.lineTo(500, 350); ctx.stroke();
+
+        players.forEach(p => {
+            p.update(); 
+            p.draw();
+
+            // Circular Collision Logic
+            let dx = ball.x - p.x;
+            let dy = ball.y - p.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist < p.r + ball.r) {
+                let angle = Math.atan2(dy, dx);
+                // Push ball out of striker to prevent getting stuck
+                let overlap = (p.r + ball.r) - dist;
+                ball.x += Math.cos(angle) * overlap;
+                ball.y += Math.sin(angle) * overlap;
+
+                // Transfer velocity
+                const speed = 12;
+                ball.vx = Math.cos(angle) * speed + (p.vx * 0.5);
+                ball.vy = Math.sin(angle) * speed + (p.vy * 0.5);
+            }
+        });
+
+        // Ball Physics
+        ball.x += ball.vx; ball.y += ball.vy;
+        ball.vx *= 0.992; ball.vy *= 0.992; // Slight friction
+
+        // Side Wall Bounce
+        if (ball.x < ball.r || ball.x > canvas.width - ball.r) {
+            ball.vx *= -1;
+            ball.x = ball.x < ball.r ? ball.r : canvas.width - ball.r;
+        }
+
+        // Scoring
+        if (ball.y < -ball.r) { 
+            p1Score++; 
+            document.getElementById('s1').innerText = p1Score;
+            spawn(); 
+        } else if (ball.y > canvas.height + ball.r) { 
+            p2Score++; 
+            document.getElementById('s2').innerText = p2Score;
+            spawn(); 
+        }
+
+        // Draw Ball
+        ctx.fillStyle = '#fff';
+        ctx.shadowBlur = 10; ctx.shadowColor = '#fff';
+        ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 0;
+
+        requestAnimationFrame(loop);
+    }
+</script>
+</body>
+</html>

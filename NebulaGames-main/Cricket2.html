@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Street Cricket Mobile</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #222;
+            color: white;
+            font-family: sans-serif;
+            overflow: hidden;
+            touch-action: none;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        canvas {
+            background: #4CAF50; /* Pitch Green */
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .ui-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            pointer-events: none;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        #menu {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        button {
+            padding: 15px 30px;
+            margin: 10px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            border-radius: 8px;
+            border: none;
+            background: #ff9800;
+            color: white;
+            font-weight: bold;
+        }
+        .split-line {
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            height: 4px;
+            background: white;
+            z-index: 5;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="menu">
+        <h1>STREET CRICKET</h1>
+        <button onclick="startGame('pve')">Player vs Bot</button>
+        <button onclick="startGame('pvp')">Player vs Player (Split Screen)</button>
+    </div>
+
+    <div class="ui-overlay">
+        <div id="score-board">Score: 0 | Outs: 0</div>
+        <div id="status">Tap to Bowl!</div>
+    </div>
+
+    <div id="split-line" class="split-line"></div>
+    <canvas id="gameCanvas"></canvas>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreBoard = document.getElementById('score-board');
+    const statusText = document.getElementById('status');
+    const splitLine = document.getElementById('split-line');
+
+    let mode = 'pve';
+    let score = 0;
+    let outs = 0;
+    let isGameOver = false;
+
+    // Game Objects
+    let ball = { x: 0, y: 0, radius: 10, speedY: 0, active: false };
+    let bat = { x: 0, y: 0, width: 60, height: 15 };
+    let wickets = { x: 0, y: 0, width: 40 };
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        bat.x = canvas.width / 2 - bat.width / 2;
+        bat.y = canvas.height - 80;
+        wickets.x = canvas.width / 2 - wickets.width / 2;
+        wickets.y = canvas.height - 50;
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+
+    function startGame(selectedMode) {
+        mode = selectedMode;
+        document.getElementById('menu').style.display = 'none';
+        if(mode === 'pvp') splitLine.style.display = 'block';
+        resetBall();
+        animate();
+    }
+
+    function resetBall() {
+        ball.x = canvas.width / 2;
+        ball.y = mode === 'pvp' ? 50 : 100;
+        ball.speedY = 0;
+        ball.active = false;
+        statusText.innerText = mode === 'pvp' ? "Top: Bowl | Bottom: Bat" : "Tap to Bowl!";
+    }
+
+    // Input Handling
+    canvas.addEventListener('touchstart', (e) => {
+        const touchY = e.touches[0].clientY;
+        
+        if (!ball.active) {
+            // Bowling logic
+            if (mode === 'pvp' && touchY > canvas.height / 2) return; // Top player bowls
+            ball.active = true;
+            ball.speedY = 7;
+            statusText.innerText = "Ball is live!";
+        } else {
+            // Batting logic
+            if (touchY > canvas.height / 2) {
+                swingBat();
+            }
+        }
+    });
+
+    // Simple click for desktop testing
+    canvas.addEventListener('mousedown', () => {
+        if (!ball.active) {
+            ball.active = true;
+            ball.speedY = 7;
+        } else {
+            swingBat();
+        }
+    });
+
+    function swingBat() {
+        // Collision Detection
+        let dist = Math.abs(ball.y - bat.y);
+        if (dist < 30 && ball.active) {
+            let hitPower = Math.floor(Math.random() * 6) + 1;
+            if (hitPower === 5) hitPower = 4; // Cricket usually 1,2,3,4,6
+            score += hitPower;
+            statusText.innerText = `HIT FOR ${hitPower}!`;
+            ball.active = false;
+            setTimeout(resetBall, 1000);
+        }
+    }
+
+    function update() {
+        if (ball.active) {
+            ball.y += ball.speedY;
+
+            // Missed the ball / Bowled out
+            if (ball.y > bat.y + 20) {
+                outs++;
+                statusText.innerText = "OUT!";
+                ball.active = false;
+                setTimeout(resetBall, 1000);
+            }
+        }
+        scoreBoard.innerText = `Score: ${score} | Outs: ${outs}`;
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Pitch
+        ctx.fillStyle = '#C19A6B';
+        ctx.fillRect(canvas.width/2 - 50, 0, 100, canvas.height);
+
+        // Draw Wickets
+        ctx.fillStyle = '#6D4C41';
+        ctx.fillRect(wickets.x, wickets.y, 5, 40);
+        ctx.fillRect(wickets.x + 17, wickets.y, 5, 40);
+        ctx.fillRect(wickets.x + 35, wickets.y, 5, 40);
+
+        // Draw Bat
+        ctx.fillStyle = '#D2B48C';
+        ctx.fillRect(bat.x, bat.y, bat.width, bat.height);
+
+        // Draw Ball
+        if (ball.active) {
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = 'red';
+            ctx.fill();
+            ctx.closePath();
+        }
+    }
+
+    function animate() {
+        update();
+        draw();
+        requestAnimationFrame(animate);
+    }
+</script>
+
+</body>
+</html>

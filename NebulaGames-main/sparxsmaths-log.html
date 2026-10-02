@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MATHS_ASSIST | AI Study Tool</title>
+    <style>
+        body { background: #000; color: #0f0; font-family: 'Courier New', monospace; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; border: 2px solid #004400; padding: 25px; background: #050505; box-shadow: 0 0 30px #002200; }
+        
+        h1 { border-bottom: 2px solid #0f0; padding-bottom: 10px; text-align: center; color: #fff; }
+        
+        .input-area { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        
+        input, textarea { background: #000; border: 1px solid #004400; color: #0f0; padding: 12px; font-family: monospace; outline: none; }
+        input:focus, textarea:focus { border-color: #0f0; }
+        textarea { height: 100px; resize: vertical; }
+        
+        .btn { background: #0f0; color: #000; border: none; padding: 12px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn:hover { background: #fff; }
+        .btn-ai { background: #0044ff; color: #fff; margin-top: 5px; }
+
+        .search-container { margin: 20px 0; border-bottom: 1px solid #004400; padding-bottom: 10px; }
+        #searchBar { width: 100%; background: transparent; border: none; font-size: 1.1rem; color: #fff; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #004400; padding: 12px; text-align: left; }
+        th { background: #002200; font-size: 0.8rem; }
+        
+        .timestamp { color: #008800; font-size: 0.7rem; }
+        .topic-tag { color: #fff; font-weight: bold; background: #111; padding: 2px 5px; border-radius: 3px; }
+        
+        .copy-hint { font-size: 0.7rem; color: #888; text-align: center; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>STUDENT_ASSIST_v3</h1>
+    
+    <div class="input-area">
+        <div class="row">
+            <input type="text" id="topic" placeholder="TOPIC (e.g. Algebra, Fractions)">
+            <input type="text" id="ans" placeholder="MY FINAL ANSWER">
+        </div>
+        <textarea id="question" placeholder="PASTE THE FULL QUESTION TEXT HERE..."></textarea>
+        <button class="btn" onclick="saveEntry()">💾 SAVE TO ARCHIVE</button>
+        <button class="btn btn-ai" onclick="askAI()">🤖 FORMAT FOR AI HELP</button>
+        <div class="copy-hint">(Clicking 'Format' copies a help request to your clipboard)</div>
+    </div>
+
+    <div class="search-container">
+        <input type="text" id="searchBar" placeholder="SEARCH PAST QUESTIONS..." onkeyup="filterLogs()">
+    </div>
+
+    <table id="logTable">
+        <thead>
+            <tr>
+                <th>DATE</th>
+                <th>TOPIC</th>
+                <th>QUESTION</th>
+                <th>MY_ANS</th>
+            </tr>
+        </thead>
+        <tbody id="logBody"></tbody>
+    </table>
+</div>
+
+<script>
+    window.onload = displayLogs;
+
+    function saveEntry() {
+        const topic = document.getElementById('topic').value || "General";
+        const q = document.getElementById('question').value;
+        const ans = document.getElementById('ans').value;
+
+        if(!q) return alert("Please paste a question first.");
+
+        const now = new Date();
+        const timestamp = now.toLocaleDateString();
+
+        const entry = { timestamp, topic, q, ans };
+        let logs = JSON.parse(localStorage.getItem('studyLogs')) || [];
+        logs.unshift(entry);
+        localStorage.setItem('studyLogs', JSON.stringify(logs));
+        
+        document.getElementById('topic').value = '';
+        document.getElementById('question').value = '';
+        document.getElementById('ans').value = '';
+        displayLogs();
+    }
+
+    function askAI() {
+        const q = document.getElementById('question').value;
+        const topic = document.getElementById('topic').value;
+        if(!q) return alert("Paste a question first!");
+
+        const prompt = `I am working on ${topic}. Can you help me understand the steps for this question: "${q}"? Please explain the method clearly.`;
+        
+        navigator.clipboard.writeText(prompt).then(() => {
+            alert("AI Prompt copied to clipboard! Paste it into our chat to get help.");
+        });
+    }
+
+    function displayLogs() {
+        const logs = JSON.parse(localStorage.getItem('studyLogs')) || [];
+        const body = document.getElementById('logBody');
+        body.innerHTML = '';
+
+        logs.forEach(item => {
+            const row = `<tr>
+                <td class="timestamp">${item.timestamp}</td>
+                <td><span class="topic-tag">${item.topic}</span></td>
+                <td style="color: #bbb; font-size: 0.85rem;">${item.q}</td>
+                <td style="color: #0f0;">${item.ans}</td>
+            </tr>`;
+            body.innerHTML += row;
+        });
+    }
+
+    function filterLogs() {
+        const query = document.getElementById('searchBar').value.toLowerCase();
+        const rows = document.querySelectorAll('#logBody tr');
+        rows.forEach(row => {
+            row.style.display = row.innerText.toLowerCase().includes(query) ? "" : "none";
+        });
+    }
+</script>
+
+</body>
+</html>

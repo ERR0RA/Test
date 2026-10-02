@@ -1,0 +1,26 @@
+{
+  "short_name": "Nebula",
+  "name": "Nebula | Ultimate Cloud Gaming Hub",
+  "description": "The ultimate futuristic cloud gaming platform with high-performance neon engines.",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#020305",
+  "display": "standalone",
+  "orientation": "landscape",
+  "theme_color": "#00ff66",
+  "id": "./",
+  "scope": "./"
+}

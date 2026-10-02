@@ -1,0 +1,46 @@
+Copyright (c) 2025-2026 Teodoro Costa
+
+All rights reserved.
+
+This source code is published publicly for transparency and personal
+reference. It is NOT open source. The following terms apply to all
+files in this repository unless otherwise noted:
+
+PERMITTED:
+  - Viewing and reading the source code for personal or educational
+    reference.
+  - Cloning the repository for the sole purpose of inspecting the code
+    or running it locally as an unmodified install of the Sparx Solver
+    Chrome extension on your own machine.
+
+NOT PERMITTED without prior written permission from the copyright holder:
+  - Redistributing, republishing, or sharing this code or any portion
+    of it, in original or modified form, in any medium.
+  - Publishing this code, or any derivative work, to the Chrome Web
+    Store, the Edge Add-ons store, the Firefox Add-ons site, or any
+    other extension marketplace, app store, or software distribution
+    channel.
+  - Selling, licensing, sublicensing, or otherwise commercialising this
+    code, or any derivative work, in whole or in part.
+  - Removing, altering, or obscuring this license or any copyright
+    notices contained in the source.
+  - Using the name "Sparx Solver", the project's icons, or other
+    identifying marks for any derivative product or service.
+
+To request permission for any of the above, contact the copyright
+holder via the GitHub repository:
+  https://github.com/Teodoro-Costa/Sparx-solver
+
+DISCLAIMER OF WARRANTY:
+This software is provided "AS IS", without warranty of any kind,
+express or implied, including but not limited to the warranties of
+merchantability, fitness for a particular purpose, and non-infringement.
+In no event shall the copyright holder be liable for any claim, damages,
+or other liability arising from, out of, or in connection with the
+software or its use.
+
+This project is not affiliated with, endorsed by, or connected to
+Sparx Learning Ltd. The user of this software is solely responsible
+for how they use it, including any consequences arising from violating
+the academic integrity policies of any educational institution or the
+Terms of Service of any third-party platform.

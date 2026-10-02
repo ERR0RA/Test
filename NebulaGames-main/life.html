@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading EX professional Edition</title>
+    <style>
+        :root {
+            --bg-main: #0d121a;
+            --bg-card: #17202e;
+            --bg-input: #1f2b3e;
+            --text-main: #ffffff;
+            --text-muted: #9aa8ba;
+            --color-up: #00ea74;
+            --color-down: #ff3b30;
+            --ui-blue: #0084ff;
+            --border-tint: rgba(255, 255, 255, 0.08);
+            --line-sr: #ffd700;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 480px;
+            background: var(--bg-card);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border-tint);
+        }
+
+        #setup-screen {
+            padding: 30px 20px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .setup-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            text-align: left;
+        }
+
+        .setup-input-group label {
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .setup-input-group input {
+            background: var(--bg-input);
+            border: 1px solid var(--border-tint);
+            padding: 14px;
+            border-radius: 10px;
+            color: white;
+            font-size: 1.1rem;
+            outline: none;
+        }
+
+        #main-brokerage-screen {
+            display: none;
+        }
+
+        .app-header {
+            padding: 15px 20px;
+            background: linear-gradient(180deg, #17202e 0%, #0d121a 100%);
+            border-bottom: 1px solid var(--border-tint);
+        }
+
+        .brand-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .brand-name {
+            font-weight: 900;
+            font-size: 1.2rem;
+            color: #ffffff;
+            letter-spacing: -0.5px;
+        }
+        
+        .brand-name span {
+            color: var(--ui-blue);
+        }
+
+        .portfolio-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin: 2px 0;
+            letter-spacing: -1px;
+        }
+
+        .header-stats-row {
+            display: flex;
+            gap: 25px;
+            margin-top: 8px;
+            font-size: 0.85rem;
+        }
+
+        /* Chart Module */
+        .chart-module {
+            background: #0d121a;
+            padding: 12px;
+            border-bottom: 1px solid var(--border-tint);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .chart-title {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: var(--text-main);
+        }
+
+        .timeframe-selector {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-input);
+            padding: 3px;
+            border-radius: 6px;
+        }
+
+        .tf-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            width: auto;
+        }
+
+        .tf-btn.active {
+            background: #ffffff;
+            color: #0d121a;
+        }
+
+        .chart-wrapper {
+            display: flex;
+            position: relative;
+            background: rgba(255,255,255,0.01);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .candlestick-canvas {
+            height: 180px;
+            flex-grow: 1;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            padding: 10px 8px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .price-y-axis {
+            width: 75px;
+            border-left: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 8px 4px;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            background: rgba(0,0,0,0.4);
+            z-index: 3;
+            user-select: none;
+        }
+
+        .sr-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            border-top: 2px dashed var(--line-sr);
+            z-index: 1;
+            pointer-events: none;
+            opacity: 0.8;
+        }
+
+        .sr-label {
+            position: absolute;
+            right: 78px;
+            font-size: 0.6rem;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-weight: bold;
+            transform: translateY(-50%);
+            z-index: 4;
+        }
+
+        .candle-stick {
+            flex-grow: 1;
+            max-width: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            height: 100%;
+        }
+
+        .candle-wick {
+            width: 2px;
+            background-color: currentColor;
+            position: absolute;
+        }
+
+        .candle-body {
+            width: 100%;
+            border-radius: 1px;
+            position: absolute;
+        }
+
+        .candle-stick.bullish { color: var(--color-up); }
+        .candle-stick.bearish { color: var(--color-down); }
+
+        .market-body {
+            padding: 15px;
+            flex-grow: 1;
+            overflow-y: auto;
+            max-height: 220px;
+        }
+
+        .instrument-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 12px 14px;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            border: 1px solid var(--border-tint);
+            cursor: pointer;
+        }
+
+        .instrument-card.selected {
+            border-color: var(--ui-blue);
+            background: rgba(0, 132, 255, 0.06);
+        }
+
+        .right-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .price-block {
+            text-align: right;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 4px;
+        }
+
+        .order-btn {
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .order-btn.buy { background-color: var(--color-up); color: #000; }
+        .order-btn.sell { background-color: var(--color-down); color: #fff; }
+
+        .app-footer {
+            padding: 12px;
+            background: #0d121a;
+            border-top: 1px solid var(--border-tint);
+        }
+
+        .log-ticker {
+            background: rgba(0,0,0,0.3);
+            font-size: 0.8rem;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            color: var(--text-muted);
+            border-left: 3px solid var(--ui-blue);
+        }
+
+        .status-badge {
+            font-size: 0.65rem;
+            background: rgba(0,234,116,0.12);
+            color: var(--color-up);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pulse-dot {
+            width: 6px;
+            height: 6px;
+            background-color: var(--color-up);
+            border-radius: 50%;
+            animation: pulse-glow 1.5s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0% { opacity: 0.4; }
+            50% { opacity: 1; }
+            100% { opacity: 0.4; }
+        }
+        
+        .up-flash { color: var(--color-up); }
+        .down-flash { color: var(--color-down); }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <div id="setup-screen">
+            <div>
+                <div style="font-size: 1.6rem; font-weight: 800; margin-bottom: 5px;">TRADING <span></span></div>
+                <div style="font-size: 0.85rem; color: var(--text-muted);">Real-Time Terminal Simulator. Enter account balance (£).</div>
+            </div>
+            
+            <div class="setup-input-group">
+                <label>Starting Investment Capital (£)</label>
+                <input type="number" id="input-starting-cash" value="10000">
+            </div>
+
+            <button style="background: var(--ui-blue); color: white;" class="main-action-btn" onclick="initializeBrokerage()">Launch Live Workspace</button>
+        </div>
+
+        <div id="main-brokerage-screen">
+            <div class="app-header">
+                <div class="brand-row">
+                    <span class="brand-name">TRADING <span></span></span>
+                    <span class="status-badge"><div class="pulse-dot"></div> LIVE TAPE TICKING</span>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Account Value (ISA)</div>
+                <div class="portfolio-value" id="val-portfolio">£10,000.00</div>
+                
+                <div class="header-stats-row">
+                    <div>
+                        <span style="color: var(--text-muted); font-size:0.75rem;">Free Funds:</span>
+                        <span id="val-cash" style="font-weight: bold;">£10,000.00</span>
+                    </div>
+                    <div>
+                        <span style="color: var(--text-muted); font-size:0.75rem;">Invested:</span>
+                        <span id="val-invested" style="font-weight: bold;">£0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-module">
+                <div class="chart-header">
+                    <span class="chart-title" id="active-chart-title">GOLD (oz) Real-Time Feed</span>
+                    <div class="timeframe-selector">
+                        <button class="tf-btn" id="tf-1d" onclick="changeTimeframe('1D')">Today</button>
+                        <button class="tf-btn" id="tf-1w" onclick="changeTimeframe('1W')">1W</button>
+                        <button class="tf-btn" id="tf-1m" onclick="changeTimeframe('1M')">1M</button>
+                        <button class="tf-btn" id="tf-1y" onclick="changeTimeframe('1Y')">1Y</button>
+                        <button class="tf-btn active" id="tf-3y" onclick="changeTimeframe('3Y')">3Y</button>
+                    </div>
+                </div>
+
+                <div class="chart-wrapper">
+                    <div id="resistance-line" class="sr-line" style="border-color: #ff3b30;"></div>
+                    <div id="resistance-tag" class="sr-label" style="background: #ff3b30; color: #fff;">RES</div>
+
+                    <div id="support-line" class="sr-line" style="border-color: #00ea74;"></div>
+                    <div id="support-tag" class="sr-label" style="background: #00ea74; color: #000;">SUPP</div>
+
+                    <div class="candlestick-canvas" id="candle-render-box"></div>
+                    
+                    <div class="price-y-axis" id="y-axis-scale">
+                        <span id="y-max">£0</span>
+                        <span id="y-mid">£0</span>
+                        <span id="y-min">£0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="market-body">
+                <div id="market-list"></div>
+            </div>
+
+            <div class="app-footer">
+                <div class="log-ticker" id="app-log">Initialising real-time price feeds...</div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let account = { cash: 10000 };
+        let selectedAssetId = "gold";
+        let currentTimeframe = "3Y";
+        let liveRefreshInterval = null;
+        let candleInterval = null;
+
+        let marketData = [
+            { id: "gold", symbol: "GOLD", name: "Gold Spot (oz)", price: 1845.00, held: 0, changePct: 0.32, initialPrice: 1845.00 },
+            { id: "silver", symbol: "SLVR", name: "Silver Spot (oz)", price: 23.10, held: 0, changePct: -1.05, initialPrice: 23.10 },
+            { id: "copper", symbol: "CPPR", name: "Copper Spot (lb)", price: 3.65, held: 0, changePct: 0.75, initialPrice: 3.65 },
+            { id: "oil", symbol: "OIL", name: "Crude Oil (bbl)", price: 62.40, held: 0, changePct: -1.85, initialPrice: 62.40 },
+            { id: "btc", symbol: "BTC", name: "Bitcoin Core Token", price: 52400.00, held: 0, changePct: 2.85, initialPrice: 52400.00 }
+        ];
+
+        let persistentCandles = {};
+
+        function loadSavedProfile() {
+            const saveProfile = localStorage.getItem('t212_centered_profile');
+            const saveMarket = localStorage.getItem('t212_centered_market');
+            const saveCandles = localStorage.getItem('t212_centered_candles');
+            if (saveProfile && saveMarket) {
+                account = JSON.parse(saveProfile);
+                marketData = JSON.parse(saveMarket);
+                if (saveCandles) persistentCandles = JSON.parse(saveCandles);
+                document.getElementById('setup-screen').style.display = 'none';
+                document.getElementById('main-brokerage-screen').style.display = 'block';
+                renderApp();
+                startAutoRefresh();
+            }
+        }
+
+        function initializeBrokerage() {
+            const fundingInput = parseFloat(document.getElementById('input-starting-cash').value);
+            if (isNaN(fundingInput) || fundingInput < 10) return;
+            account.cash = fundingInput;
+            
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('main-brokerage-screen').style.display = 'block';
+            saveState();
+            renderApp();
+            startAutoRefresh();
+        }
+
+        function startAutoRefresh() {
+            fetchRealWorldPrices(); 
+            if (liveRefreshInterval) clearInterval(liveRefreshInterval);
+            liveRefreshInterval = setInterval(fetchRealWorldPrices, 3000);
+
+            if (candleInterval) clearInterval(candleInterval);
+            candleInterval = setInterval(cycleCandleTimeline, 90000); 
+        }
+
+        function saveState() {
+            localStorage.setItem('t212_centered_profile', JSON.stringify(account));
+            localStorage.setItem('t212_centered_market', JSON.stringify(marketData));
+            localStorage.setItem('t212_centered_candles', JSON.stringify(persistentCandles));
+        }
+
+        function renderApp() {
+            let investedValue = 0;
+            marketData.forEach(a => investedValue += (a.held * a.price));
+            let totalPortfolioValue = account.cash + investedValue;
+
+            document.getElementById('val-portfolio').innerText = "£" + totalPortfolioValue.toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2});
+            document.getElementById('val-cash').innerText = "£" + account.cash.toLocaleString(undefined,{minimumFractionDigits:2});
+            document.getElementById('val-invested').innerText = "£" + investedValue.toLocaleString(undefined,{minimumFractionDigits:2});
+
+            const container = document.getElementById('market-list');
+            container.innerHTML = "";
+
+            marketData.forEach(asset => {
+                let activeSelectionClass = asset.id === selectedAssetId ? "selected" : "";
+                let changeClass = asset.changePct >= 0 ? "up-flash" : "down-flash";
+                let sign = asset.changePct >= 0 ? "+" : "";
+                let displayHoldings = asset.held > 0 ? `Held: ${asset.held}` : "0 Shares";
+
+                let cardHTML = `
+                    <div class="instrument-card ${activeSelectionClass}" onclick="setSelectedAsset('${asset.id}')">
+                        <div class="left-info">
+                            <span class="asset-symbol" style="font-weight:700;">${asset.symbol}</span>
+                            <span class="asset-name" style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">${asset.name} • <b>${displayHoldings}</b></span>
+                        </div>
+                        <div class="right-info">
+                            <div class="price-block">
+                                <div class="asset-price" style="font-weight:600;">£${asset.price.toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})}</div>
+                                <div class="asset-chg ${changeClass}" style="font-size:0.75rem; font-weight:700;">${sign}${asset.changePct.toFixed(2)}%</div>
+                            </div>
+                            <div class="action-buttons">
+                                <button class="order-btn buy" onclick="executeTrade(event, '${asset.id}', 'BUY')">BUY</button>
+                                <button class="order-btn sell" onclick="executeTrade(event, '${asset.id}', 'SELL')">SELL</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', cardHTML);
+            });
+
+            renderCandlestickGraphic();
+        }
+
+        function setSelectedAsset(id) {
+            selectedAssetId = id;
+            let asset = marketData.find(a => a.id === id);
+            document.getElementById('active-chart-title').innerText = `${asset.name} Live View`;
+            renderApp();
+        }
+
+        function changeTimeframe(tf) {
+            currentTimeframe = tf;
+            document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`tf-${tf.toLowerCase()}`).classList.add('active');
+            renderCandlestickGraphic();
+        }
+
+        function executeTrade(e, id, side) {
+            e.stopPropagation(); 
+            let asset = marketData.find(a => a.id === id);
+            if (!asset) return;
+
+            if (side === 'BUY') {
+                if (account.cash < asset.price) {
+                    document.getElementById('app-log').innerText = "Insufficient funds available to open order position.";
+                    return;
+                }
+                account.cash -= asset.price;
+                asset.held += 1;
+                document.getElementById('app-log').innerText = `Buy market execution complete: 1 unit ${asset.symbol}.`;
+            } else {
+                if (asset.held < 1) {
+                    document.getElementById('app-log').innerText = "No active holdings found in target position line.";
+                    return;
+                }
+                asset.held -= 1;
+                account.cash += asset.price;
+                document.getElementById('app-log').innerText = `Sell market execution complete: 1 unit ${asset.symbol}.`;
+            }
+            saveState();
+            renderApp();
+        }
+
+        async function fetchRealWorldPrices() {
+            try {
+                const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=gbp');
+                const data = await res.json();
+                
+                if (data && data.bitcoin) {
+                    let btcAsset = marketData.find(a => a.id === 'btc');
+                    btcAsset.changePct = ((data.bitcoin.gbp - btcAsset.initialPrice) / btcAsset.initialPrice) * 100;
+                    btcAsset.price = data.bitcoin.gbp;
+                }
+
+                marketData.forEach(asset => {
+                    if (asset.id !== 'btc') {
+                        let dynamicFluctuation = (Math.random() * 0.1 - 0.05);
+                        asset.price = Math.max(1, asset.price + (asset.price * (dynamicFluctuation / 100)));
+                        asset.changePct = ((asset.price - asset.initialPrice) / asset.initialPrice) * 100;
+                    }
+                    updateCurrentCandlePrice(asset.id, asset.price);
+                });
+
+                document.getElementById('app-log').innerText = "Trading Engine Live Sync: Connected to public execution tape.";
+                saveState();
+                renderApp();
+            } catch (err) {
+                marketData.forEach(asset => {
+                    let randFactor = (Math.random() * 0.14 - 0.07);
+                    asset.price = Math.max(1, asset.price + (asset.price * (randFactor / 100)));
+                    asset.changePct = ((asset.price - asset.initialPrice) / asset.initialPrice) * 100;
+                    updateCurrentCandlePrice(asset.id, asset.price);
+                });
+                renderApp();
+            }
+        }
+
+        function getBarParameters() {
+            let barCount = 14; let variance = 8;
+            if (currentTimeframe === '1D') { barCount = 8; variance = 1.5; }
+            if (currentTimeframe === '1W') { barCount = 9; variance = 4; }
+            if (currentTimeframe === '1M') { barCount = 12; variance = 10; }
+            if (currentTimeframe === '1Y') { barCount = 18; variance = 40; }
+            if (currentTimeframe === '3Y') { barCount = 24; variance = 95; }
+            return { barCount, variance };
+        }
+
+        function checkGenerateBaseCandles(assetId) {
+            let key = assetId + "_" + currentTimeframe;
+            if (!persistentCandles[key] || persistentCandles[key].length === 0) {
+                let params = getBarParameters();
+                let asset = marketData.find(a => a.id === assetId);
+                let basePrice = asset.initialPrice;
+                let candles = [];
+                
+                // Construct cleanly centered historical candles around the middle of the asset price range
+                for(let i = 0; i < params.barCount; i++) {
+                    let direction = Math.random() > 0.5 ? 1 : -1;
+                    let open = basePrice + (Math.random() * params.variance * 0.3 * direction);
+                    let close = open + (Math.random() * params.variance * 0.4 * (Math.random() > 0.5 ? 1 : -1));
+                    let high = Math.max(open, close) + (Math.random() * (params.variance * 0.5));
+                    let low = Math.min(open, close) - (Math.random() * (params.variance * 0.5));
+                    candles.push({ open, close, high, low });
+                    basePrice = close;
+                }
+                persistentCandles[key] = candles;
+            }
+            return persistentCandles[key];
+        }
+
+        function updateCurrentCandlePrice(assetId, currentPrice) {
+            let timeframes = ['1D', '1W', '1M', '1Y', '3Y'];
+            timeframes.forEach(tf => {
+                let key = assetId + "_" + tf;
+                if (persistentCandles[key] && persistentCandles[key].length > 0) {
+                    let activeArr = persistentCandles[key];
+                    let finalCandle = activeArr[activeArr.length - 1];
+                    finalCandle.close = currentPrice;
+                    if (currentPrice > finalCandle.high) finalCandle.high = currentPrice;
+                    if (currentPrice < finalCandle.low) finalCandle.low = currentPrice;
+                }
+            });
+        }
+
+        function cycleCandleTimeline() {
+            let timeframes = ['1D', '1W', '1M', '1Y', '3Y'];
+            marketData.forEach(asset => {
+                timeframes.forEach(tf => {
+                    let key = asset.id + "_" + tf;
+                    if (persistentCandles[key] && persistentCandles[key].length > 0) {
+                        let activeArr = persistentCandles[key];
+                        let finalCandle = activeArr[activeArr.length - 1];
+                        
+                        activeArr.push({
+                            open: finalCandle.close,
+                            close: finalCandle.close,
+                            high: finalCandle.close,
+                            low: finalCandle.close
+                        });
+                        if (activeArr.length > 35) activeArr.shift();
+                    }
+                });
+            });
+            saveState();
+            renderApp();
+        }
+
+        function renderCandlestickGraphic() {
+            const canvas = document.getElementById('candle-render-box');
+            canvas.innerHTML = "";
+
+            let candles = checkGenerateBaseCandles(selectedAssetId);
+            let asset = marketData.find(a => a.id === selectedAssetId);
+
+            let allHighs = candles.map(c => c.high);
+            let allLows = candles.map(c => c.low);
+            let absoluteMax = Math.max(...allHighs);
+            let absoluteMin = Math.min(...allLows);
+            
+            // Build a mathematically centered frame
+            let midpoint = (absoluteMax + absoluteMin) / 2;
+            let initialRange = absoluteMax - absoluteMin || 1;
+            
+            // Force clean padding around elements
+            let finalMax = midpoint + (initialRange * 0.7);
+            let finalMin = midpoint - (initialRange * 0.7);
+            let viewRange = finalMax - finalMin || 1;
+
+            // Balance Support & Resistance directly around the mid-level geometry 
+            let fixedResistance = midpoint + (initialRange * 0.3);
+            let fixedSupport = midpoint - (initialRange * 0.3);
+
+            document.getElementById('y-max').innerText = "£" + finalMax.toLocaleString(undefined, {maximumFractionDigits: 2});
+            document.getElementById('y-mid').innerText = "£" + midpoint.toLocaleString(undefined, {maximumFractionDigits: 2});
+            document.getElementById('y-min').innerText = "£" + finalMin.toLocaleString(undefined, {maximumFractionDigits: 2});
+
+            let supportPercentTop = ((finalMax - fixedSupport) / viewRange) * 100;
+            let resistancePercentTop = ((finalMax - fixedResistance) / viewRange) * 100;
+
+            document.getElementById('support-line').style.top = supportPercentTop + "%";
+            document.getElementById('support-tag').style.top = supportPercentTop + "%";
+            document.getElementById('resistance-line').style.top = resistancePercentTop + "%";
+            document.getElementById('resistance-tag').style.top = resistancePercentTop + "%";
+
+            candles.forEach(candle => {
+                let bull = candle.close >= candle.open;
+                let typeClass = bull ? "bullish" : "bearish";
+
+                let bodyTop = ((finalMax - Math.max(candle.open, candle.close)) / viewRange) * 100;
+                let bodyHeight = (Math.abs(candle.open - candle.close) / viewRange) * 100;
+                let wickTop = ((finalMax - candle.high) / viewRange) * 100;
+                let wickHeight = ((candle.high - candle.low) / viewRange) * 100;
+
+                bodyHeight = Math.max(bodyHeight, 2.5); 
+
+                let candleElement = `
+                    <div class="candle-stick ${typeClass}">
+                        <div class="candle-wick" style="top: ${wickTop}%; height: ${wickHeight}%;"></div>
+                        <div class="candle-body" style="top: ${bodyTop}%; height: ${bodyHeight}%; background-color: currentColor;"></div>
+                    </div>
+                `;
+                canvas.insertAdjacentHTML('beforeend', candleElement);
+            });
+        }
+
+        loadSavedProfile();
+        renderApp();
+    </script>
+</body>
+</html>

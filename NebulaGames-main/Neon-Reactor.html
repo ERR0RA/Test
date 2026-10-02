@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Neon Reactor</title>
+  <style>
+    :root{
+      --bg:#060912; --bg2:#0b1330; --cyan:#27e7ff; --mag:#ff4de6; --lime:#a4ff3f; --red:#ff476f; --txt:#e9f9ff;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(circle at 20% 15%,#15234a 0%,#070c1b 45%,#04060d 100%);font-family:Arial,sans-serif;color:var(--txt)}
+    #wrap{position:fixed;inset:0;display:grid;place-items:center;padding:8px}
+    canvas{width:min(100vw - 16px,920px);height:min(100vh - 120px,620px);border:1px solid rgba(39,231,255,.45);border-radius:10px;box-shadow:0 0 28px rgba(39,231,255,.25), inset 0 0 35px rgba(255,77,230,.08);background:linear-gradient(180deg,#0a1330 0%,#060b18 100%)}
+    #hud{position:fixed;left:8px;right:8px;top:8px;display:flex;gap:8px;justify-content:space-between;z-index:5;pointer-events:none}
+    .pill{background:rgba(8,14,26,.75);border:1px solid rgba(39,231,255,.3);border-radius:999px;padding:8px 13px;font-weight:800;font-size:14px}
+    #menu{position:fixed;inset:0;display:grid;place-items:center;z-index:6;background:rgba(2,5,10,.62);backdrop-filter:blur(5px)}
+    #card{width:min(92vw,500px);background:rgba(7,13,24,.95);border:1px solid rgba(39,231,255,.45);border-radius:10px;padding:18px;text-align:center;box-shadow:0 0 30px rgba(39,231,255,.2)}
+    h1{margin:0 0 8px;font-size:34px;color:#a2f6ff;text-shadow:0 0 12px rgba(39,231,255,.55),0 0 18px rgba(255,77,230,.25)}
+    p{margin:8px 0;opacity:.9}
+    .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+    button{border:1px solid rgba(39,231,255,.45);border-radius:999px;padding:10px 16px;background:linear-gradient(180deg,#0e1f3a,#091427);color:#def8ff;font-weight:800;cursor:pointer}
+    button:active{transform:translateY(1px)}
+    #touch{position:fixed;left:0;right:0;bottom:8px;display:none;justify-content:center;gap:8px;z-index:8}
+    .t{width:76px;height:56px;border-radius:12px;border:1px solid rgba(39,231,255,.38);background:rgba(6,12,22,.92);color:#dff9ff;font-size:20px;font-weight:900}
+    @media (max-width:900px), (pointer:coarse){#touch{display:flex}}
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <div class="pill" id="score">Score: 0</div>
+    <div class="pill" id="combo">Combo: x1</div>
+    <div class="pill" id="energy">Burst: 0%</div>
+    <div class="pill" id="best">Best: 0</div>
+  </div>
+
+  <div id="wrap"><canvas id="c" width="920" height="620"></canvas></div>
+
+  <div id="menu">
+    <div id="card">
+      <h1>NEON REACTOR</h1>
+      <p>Orbit core. Slice drones. Chain combos. Survive boss pulses.</p>
+      <p>PC: A/D or ←/→ to rotate, Space to Burst slow-mo</p>
+      <p>Mobile: ◀ ▶ rotate, BURST to trigger</p>
+      <div class="row">
+        <button id="play">Start Run</button>
+        <button id="hard">Hard Mode</button>
+      </div>
+      <p id="last"></p>
+    </div>
+  </div>
+
+  <div id="touch">
+    <button class="t" id="l">◀</button>
+    <button class="t" id="b">BURST</button>
+    <button class="t" id="r">▶</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height, CX = W/2, CY = H/2;
+    const scoreEl = document.getElementById('score');
+    const comboEl = document.getElementById('combo');
+    const energyEl = document.getElementById('energy');
+    const bestEl = document.getElementById('best');
+    const menu = document.getElementById('menu');
+    const lastEl = document.getElementById('last');
+
+    const input = {left:false,right:false,burst:false};
+    let running=false, hard=false, t=0, score=0, best=+localStorage.getItem('neon_reactor_best')||0;
+    let combo=1, comboTimer=0, spawnTimer=0, bossTimer=0, wave=1, timeScale=1, flash=0;
+    bestEl.textContent='Best: '+best;
+
+    const player = {a:-Math.PI/2, r:170, w:0.065, hp:100, burst:0};
+    const enemies=[], shots=[], sparks=[], rings=[];
+
+    function reset(){
+      running=true; t=0; score=0; combo=1; comboTimer=0; spawnTimer=0; bossTimer=0; wave=1; flash=0;
+      timeScale=1; player.a=-Math.PI/2; player.hp=100; player.burst=0;
+      enemies.length=shots.length=sparks.length=rings.length=0;
+      menu.style.display='none';
+      updateHUD();
+    }
+
+    function spawnEnemy(kind='drone'){
+      const edge = Math.floor(Math.random()*4);
+      let x=0,y=0;
+      if(edge===0){x=Math.random()*W;y=-30}
+      if(edge===1){x=W+30;y=Math.random()*H}
+      if(edge===2){x=Math.random()*W;y=H+30}
+      if(edge===3){x=-30;y=Math.random()*H}
+      const spd = (kind==='boss'?1.25:2.0) + Math.random()*0.8 + wave*0.05 + (hard?0.35:0);
+      enemies.push({x,y,vx:0,vy:0,r:kind==='boss'?34:14,hp:kind==='boss'?18:2,kind,spin:Math.random()*6});
+    }
+
+    function shootEnemy(e){
+      const a = Math.atan2(CY-e.y, CX-e.x);
+      shots.push({x:e.x,y:e.y,vx:Math.cos(a)*4.8,vy:Math.sin(a)*4.8,r:4});
+    }
+
+    function burst(){
+      if(player.burst>=100){
+        player.burst=0;
+        timeScale=0.45;
+        rings.push({r:30,w:12,life:30,color:'#ff4de6'});
+        for(let i=0;i<26;i++) sparks.push({x:CX,y:CY,vx:(Math.random()-0.5)*11,vy:(Math.random()-0.5)*11,life:22,color:'#ff4de6'});
+      }
+    }
+
+    function addScore(v){
+      score += Math.floor(v*combo);
+      comboTimer = 90;
+      combo = Math.min(12, combo + 0.35);
+      player.burst = Math.min(100, player.burst + 7);
+    }
+
+    function damageCore(d){
+      player.hp -= d;
+      flash = 10;
+      combo = 1;
+      if(player.hp<=0) endRun();
+    }
+
+    function endRun(){
+      running=false;
+      if(score>best){best=score;localStorage.setItem('neon_reactor_best',best)}
+      bestEl.textContent='Best: '+best;
+      lastEl.textContent='Run score: '+score+' | Wave '+wave;
+      menu.style.display='grid';
+    }
+
+    function playerPos(){
+      return {x:CX+Math.cos(player.a)*player.r, y:CY+Math.sin(player.a)*player.r};
+    }
+
+    function update(){
+      if(!running) return;
+      t+=0.016;
+
+      // rotate
+      if(input.left) player.a -= player.w*timeScale*1.7;
+      if(input.right) player.a += player.w*timeScale*1.7;
+      if(input.burst){input.burst=false;burst()}
+
+      // decay
+      if(comboTimer>0) comboTimer--; else combo=Math.max(1, combo-0.025);
+      if(flash>0) flash--;
+      timeScale += (1-timeScale)*0.05;
+
+      // spawns
+      spawnTimer--;
+      if(spawnTimer<=0){
+        spawnEnemy('drone');
+        if(Math.random()<0.28+wave*0.002) spawnEnemy('drone');
+        spawnTimer = Math.max(16, 46 - wave*0.4 - (hard?7:0));
+      }
+      bossTimer++;
+      if(bossTimer>720){
+        bossTimer=0; wave++; spawnEnemy('boss');
+      }
+
+      // enemies
+      const p = playerPos();
+      for(let i=enemies.length-1;i>=0;i--){
+        const e = enemies[i];
+        const a = Math.atan2(CY-e.y, CX-e.x);
+        const s = (e.kind==='boss'?1.0:1.8) + wave*0.03;
+        e.vx += Math.cos(a)*0.08*s*timeScale;
+        e.vy += Math.sin(a)*0.08*s*timeScale;
+        e.vx *= 0.985; e.vy *= 0.985;
+        e.x += e.vx*timeScale; e.y += e.vy*timeScale;
+        e.spin += 0.12*timeScale;
+
+        // enemy fire
+        if(e.kind==='boss' && Math.random()<0.03*timeScale) shootEnemy(e);
+
+        // intercept by blade
+        const dBlade = Math.hypot(e.x-p.x,e.y-p.y);
+        if(dBlade < e.r + 18){
+          e.hp -= 2;
+          addScore(e.kind==='boss'?22:8);
+          for(let k=0;k<10;k++) sparks.push({x:e.x,y:e.y,vx:(Math.random()-0.5)*7,vy:(Math.random()-0.5)*7,life:18,color:'#27e7ff'});
+          if(e.hp<=0){
+            addScore(e.kind==='boss'?120:28);
+            rings.push({r:10,w:6,life:24,color:e.kind==='boss'?'#ff4de6':'#a4ff3f'});
+            enemies.splice(i,1);
+            continue;
+          }
+        }
+
+        // reaches core
+        if(Math.hypot(e.x-CX,e.y-CY) < 44){
+          damageCore(e.kind==='boss'?20:10);
+          rings.push({r:8,w:8,life:20,color:'#ff476f'});
+          enemies.splice(i,1);
+        }
+      }
+
+      // shots
+      for(let i=shots.length-1;i>=0;i--){
+        const s=shots[i];
+        s.x+=s.vx*timeScale; s.y+=s.vy*timeScale;
+        if(s.x<-20||s.x>W+20||s.y<-20||s.y>H+20){shots.splice(i,1);continue;}
+        if(Math.hypot(s.x-CX,s.y-CY)<42){
+          damageCore(6);
+          shots.splice(i,1);
+          continue;
+        }
+        const p2 = playerPos();
+        if(Math.hypot(s.x-p2.x,s.y-p2.y)<22){
+          addScore(10);
+          player.burst=Math.min(100,player.burst+8);
+          sparks.push({x:s.x,y:s.y,vx:(Math.random()-0.5)*8,vy:(Math.random()-0.5)*8,life:16,color:'#a4ff3f'});
+          shots.splice(i,1);
+        }
+      }
+
+      // fx
+      for(let i=sparks.length-1;i>=0;i--){
+        const sp=sparks[i]; sp.x+=sp.vx*timeScale; sp.y+=sp.vy*timeScale; sp.vx*=0.97; sp.vy*=0.97; sp.life--;
+        if(sp.life<=0) sparks.splice(i,1);
+      }
+      for(let i=rings.length-1;i>=0;i--){
+        const r=rings[i]; r.r+=6*timeScale; r.life--; if(r.life<=0) rings.splice(i,1);
+      }
+
+      updateHUD();
+    }
+
+    function updateHUD(){
+      scoreEl.textContent='Score: '+score;
+      comboEl.textContent='Combo: x'+combo.toFixed(1);
+      energyEl.textContent='Burst: '+Math.floor(player.burst)+'%';
+      bestEl.textContent='Best: '+best;
+    }
+
+    function draw(){
+      // bg
+      ctx.clearRect(0,0,W,H);
+      const g=ctx.createRadialGradient(CX,CY,30,CX,CY,420);
+      g.addColorStop(0,'#0f1f42'); g.addColorStop(1,'#060b17');
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+      // grid
+      ctx.strokeStyle='rgba(39,231,255,0.12)';
+      for(let r=70;r<380;r+=42){ctx.beginPath();ctx.arc(CX,CY,r,0,Math.PI*2);ctx.stroke();}
+      for(let a=0;a<Math.PI*2;a+=Math.PI/10){
+        ctx.beginPath(); ctx.moveTo(CX+Math.cos(a)*40,CY+Math.sin(a)*40); ctx.lineTo(CX+Math.cos(a)*380,CY+Math.sin(a)*380); ctx.stroke();
+      }
+
+      // core
+      ctx.beginPath(); ctx.arc(CX,CY,34,0,Math.PI*2);
+      ctx.fillStyle = flash>0 ? '#ff476f' : '#27e7ff';
+      ctx.shadowBlur=20; ctx.shadowColor=ctx.fillStyle; ctx.fill(); ctx.shadowBlur=0;
+
+      // hp ring
+      ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=8; ctx.beginPath(); ctx.arc(CX,CY,52,0,Math.PI*2); ctx.stroke();
+      ctx.strokeStyle= player.hp>45 ? '#a4ff3f' : '#ff476f';
+      ctx.beginPath(); ctx.arc(CX,CY,52,-Math.PI/2,-Math.PI/2+Math.PI*2*(Math.max(0,player.hp)/100)); ctx.stroke();
+
+      // rings
+      for(const r of rings){
+        ctx.strokeStyle=r.color; ctx.globalAlpha=Math.max(0,r.life/30); ctx.lineWidth=r.w;
+        ctx.beginPath(); ctx.arc(CX,CY,r.r,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1;
+      }
+
+      // blade
+      const p = playerPos();
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(player.a + Math.PI/2);
+      ctx.fillStyle='#27e7ff'; ctx.shadowBlur=16; ctx.shadowColor='#27e7ff';
+      ctx.beginPath(); ctx.moveTo(0,-22); ctx.lineTo(14,18); ctx.lineTo(0,10); ctx.lineTo(-14,18); ctx.closePath(); ctx.fill();
+      ctx.restore(); ctx.shadowBlur=0;
+
+      // tether
+      ctx.strokeStyle='rgba(255,77,230,0.45)'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(CX,CY); ctx.lineTo(p.x,p.y); ctx.stroke();
+
+      // enemies
+      for(const e of enemies){
+        ctx.save(); ctx.translate(e.x,e.y); ctx.rotate(e.spin);
+        ctx.strokeStyle=e.kind==='boss'?'#ff4de6':'#ff476f';
+        ctx.lineWidth=e.kind==='boss'?4:3; ctx.shadowBlur=14; ctx.shadowColor=ctx.strokeStyle;
+        if(e.kind==='boss'){
+          ctx.strokeRect(-22,-22,44,44);
+          ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.stroke();
+        }else{
+          ctx.beginPath(); ctx.moveTo(0,-e.r); ctx.lineTo(e.r,0); ctx.lineTo(0,e.r); ctx.lineTo(-e.r,0); ctx.closePath(); ctx.stroke();
+        }
+        ctx.restore(); ctx.shadowBlur=0;
+      }
+
+      // shots
+      for(const s of shots){
+        ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+        ctx.fillStyle='#ffb347'; ctx.shadowBlur=12; ctx.shadowColor='#ffb347'; ctx.fill(); ctx.shadowBlur=0;
+      }
+
+      // sparks
+      for(const sp of sparks){
+        ctx.fillStyle=sp.color; ctx.globalAlpha=Math.max(0,sp.life/22); ctx.fillRect(sp.x,sp.y,3,3); ctx.globalAlpha=1;
+      }
+    }
+
+    function loop(){ update(); draw(); requestAnimationFrame(loop); }
+
+    // input
+    document.addEventListener('keydown',e=>{
+      const k=e.key.toLowerCase();
+      if(k==='a'||e.key==='ArrowLeft') input.left=true;
+      if(k==='d'||e.key==='ArrowRight') input.right=true;
+      if(e.code==='Space'){e.preventDefault();input.burst=true;}
+    });
+    document.addEventListener('keyup',e=>{
+      const k=e.key.toLowerCase();
+      if(k==='a'||e.key==='ArrowLeft') input.left=false;
+      if(k==='d'||e.key==='ArrowRight') input.right=false;
+    });
+
+    function bindHold(id,key){
+      const el=document.getElementById(id);
+      const on=e=>{e.preventDefault();input[key]=true};
+      const off=e=>{e.preventDefault();input[key]=false};
+      el.addEventListener('touchstart',on,{passive:false});
+      el.addEventListener('touchend',off,{passive:false});
+      el.addEventListener('mousedown',on); el.addEventListener('mouseup',off); el.addEventListener('mouseleave',off);
+    }
+    bindHold('l','left'); bindHold('r','right');
+    const b=document.getElementById('b');
+    b.addEventListener('touchstart',e=>{e.preventDefault();input.burst=true},{passive:false});
+    b.addEventListener('mousedown',()=>input.burst=true);
+
+    document.getElementById('play').onclick=()=>{hard=false;reset();};
+    document.getElementById('hard').onclick=()=>{hard=true;reset();};
+
+    updateHUD(); draw(); loop();
+  </script>
+</body>
+</html>

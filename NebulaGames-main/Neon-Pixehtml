@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Neon Pixel Arena Clash</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: Arial, sans-serif;
+  touch-action: manipulation;
+}
+
+body {
+  background: radial-gradient(circle at top, #0f172a, #020617 70%);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  min-height: 100vh;
+}
+
+h1 {
+  margin-top: 10px;
+  color: #67e8f9;
+  font-size: 2rem;
+  text-shadow: 0 0 12px #22d3ee, 0 0 25px #8b5cf6;
+}
+
+#menu {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 12px;
+}
+
+button, select {
+  padding: 12px 18px;
+  border-radius: 16px;
+  border: none;
+  color: white;
+  font-size: 1rem;
+  background: linear-gradient(135deg, #00f5ff, #8b5cf6);
+  box-shadow: 0 0 12px #00f5ff;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+button:hover {
+  transform: scale(1.07);
+  box-shadow: 0 0 20px #00f5ff, 0 0 35px #8b5cf6;
+}
+
+canvas {
+  width: min(95vw, 900px);
+  height: min(72vh, 550px);
+  background: radial-gradient(circle, #111827, #020617);
+  border: 3px solid #00f5ff;
+  border-radius: 20px;
+  box-shadow: 0 0 18px #00f5ff, 0 0 40px #8b5cf6;
+}
+
+#info {
+  margin: 10px;
+  font-size: 1.1rem;
+  color: #c4b5fd;
+  text-shadow: 0 0 8px #8b5cf6;
+}
+
+#mobileControls {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+}
+
+.controlSide {
+  display: flex;
+  gap: 10px;
+}
+
+.controlBtn {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  border: none;
+  background: rgba(0,245,255,0.2);
+  color: white;
+  box-shadow: 0 0 15px #00f5ff;
+}
+
+@media (min-width: 900px) {
+  #mobileControls {
+    display: none;
+  }
+}
+</style>
+</head>
+<body>
+
+<h1>⚡ Neon Pixel Arena Clash ⚡</h1>
+
+<div id="menu">
+  <select id="mode">
+    <option value="1">1 Player vs Bot</option>
+    <option value="2">2 Players</option>
+    <option value="3">Bot vs Bot</option>
+  </select>
+  <button onclick="startGame()">Start Game</button>
+</div>
+
+<div id="info">First to 5 points wins!</div>
+
+<canvas id="game" width="900" height="550"></canvas>
+
+<div id="mobileControls">
+  <div class="controlSide">
+    <button class="controlBtn" id="leftBtn">◀</button>
+    <button class="controlBtn" id="rightBtn">▶</button>
+  </div>
+
+  <div class="controlSide">
+    <button class="controlBtn" id="aBtn">A</button>
+    <button class="controlBtn" id="dBtn">D</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+let mode = 1;
+
+const player1 = {
+  x: 100,
+  y: 250,
+  w: 40,
+  h: 40,
+  color: '#00f5ff',
+  score: 0,
+  speed: 6
+};
+
+const player2 = {
+  x: 760,
+  y: 250,
+  w: 40,
+  h: 40,
+  color: '#ff00ff',
+  score: 0,
+  speed: 6
+};
+
+const orb = {
+  x: 450,
+  y: 275,
+  r: 12,
+  dx: 5,
+  dy: 4
+};
+
+const keys = {};
+
+document.addEventListener('keydown', e => keys[e.key] = true);
+document.addEventListener('keyup', e => keys[e.key] = false);
+
+function startGame() {
+  mode = parseInt(document.getElementById('mode').value);
+  player1.score = 0;
+  player2.score = 0;
+  resetBall();
+}
+
+function resetBall() {
+  orb.x = canvas.width / 2;
+  orb.y = canvas.height / 2;
+  orb.dx = (Math.random() > 0.5 ? 5 : -5);
+  orb.dy = (Math.random() * 6) - 3;
+}
+
+function movePlayers() {
+  if(mode !== 3) {
+    if(keys['ArrowUp']) player1.y -= player1.speed;
+    if(keys['ArrowDown']) player1.y += player1.speed;
+  }
+
+  if(mode === 2) {
+    if(keys['w']) player2.y -= player2.speed;
+    if(keys['s']) player2.y += player2.speed;
+  }
+
+  if(mode === 1 || mode === 3) {
+    if(orb.y < player2.y + player2.h/2) player2.y -= 4;
+    if(orb.y > player2.y + player2.h/2) player2.y += 4;
+  }
+
+  if(mode === 3) {
+    if(orb.y < player1.y + player1.h/2) player1.y -= 4;
+    if(orb.y > player1.y + player1.h/2) player1.y += 4;
+  }
+
+  player1.y = Math.max(0, Math.min(canvas.height - player1.h, player1.y));
+  player2.y = Math.max(0, Math.min(canvas.height - player2.h, player2.y));
+}
+
+function moveBall() {
+  orb.x += orb.dx;
+  orb.y += orb.dy;
+
+  if(orb.y <= 0 || orb.y >= canvas.height) {
+    orb.dy *= -1;
+  }
+
+  if(
+    orb.x - orb.r < player1.x + player1.w &&
+    orb.y > player1.y &&
+    orb.y < player1.y + player1.h
+  ) {
+    orb.dx *= -1.05;
+  }
+
+  if(
+    orb.x + orb.r > player2.x &&
+    orb.y > player2.y &&
+    orb.y < player2.y + player2.h
+  ) {
+    orb.dx *= -1.05;
+  }
+
+  if(orb.x < 0) {
+    player2.score++;
+    resetBall();
+  }
+
+  if(orb.x > canvas.width) {
+    player1.score++;
+    resetBall();
+  }
+}
+
+function neonRect(x,y,w,h,color) {
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 20;
+  ctx.fillStyle = color;
+  ctx.fillRect(x,y,w,h);
+  ctx.shadowBlur = 0;
+}
+
+function draw() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  for(let i=0;i<canvas.height;i+=35){
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(canvas.width/2-2, i, 4, 20);
+  }
+
+  neonRect(player1.x, player1.y, player1.w, player1.h, player1.color);
+  neonRect(player2.x, player2.y, player2.w, player2.h, player2.color);
+
+  ctx.beginPath();
+  ctx.arc(orb.x, orb.y, orb.r, 0, Math.PI*2);
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = '#ffffff';
+  ctx.shadowBlur = 20;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  ctx.font = '32px Arial';
+  ctx.fillStyle = '#67e8f9';
+  ctx.fillText(player1.score, canvas.width/2 - 70, 50);
+  ctx.fillStyle = '#ff7bff';
+  ctx.fillText(player2.score, canvas.width/2 + 40, 50);
+
+  if(player1.score >= 5 || player2.score >= 5) {
+    ctx.fillStyle = '#fff';
+    ctx.font = '50px Arial';
+    ctx.fillText(
+      player1.score >= 5 ? 'Player 1 Wins!' : 'Player 2 Wins!',
+      canvas.width/2 - 180,
+      canvas.height/2
+    );
+  } else {
+    movePlayers();
+    moveBall();
+    requestAnimationFrame(draw);
+  }
+}
+
+function loop() {
+  draw();
+}
+
+loop();
+
+function holdButton(btn, key) {
+  btn.addEventListener('touchstart', e => {
+    e.preventDefault();
+    keys[key] = true;
+  });
+
+  btn.addEventListener('touchend', e => {
+    e.preventDefault();
+    keys[key] = false;
+  });
+}
+
+holdButton(document.getElementById('leftBtn'), 'ArrowUp');
+holdButton(document.getElementById('rightBtn'), 'ArrowDown');
+holdButton(document.getElementById('aBtn'), 'w');
+holdButton(document.getElementById('dBtn'), 's');
+</script>
+
+</body>
+</html>

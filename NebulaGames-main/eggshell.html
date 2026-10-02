@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nebula | Split-Screen Combat</title>
+    <style>
+        :root { --primary: #00ff88; --secondary: #ff0077; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Plus Jakarta Sans', sans-serif; }
+        
+        #ui-layer { position: absolute; inset: 0; pointer-events: none; z-index: 5; display: flex; }
+        .hud-half { flex: 1; position: relative; border: 1px solid rgba(255,255,255,0.1); }
+        
+        .crosshair { 
+            position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; 
+            border: 1px solid var(--primary); border-radius: 50%; transform: translate(-50%, -50%); 
+        }
+        .p2-color { border-color: var(--secondary) !important; }
+
+        #overlay { 
+            position: absolute; inset: 0; background: #000; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            color: white; cursor: pointer; z-index: 100;
+        }
+        .start-btn {
+            padding: 20px 60px; background: none; border: 1px solid var(--primary);
+            color: var(--primary); font-weight: 800; letter-spacing: 5px; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div id="ui-layer">
+    <div class="hud-half"><div class="crosshair"></div></div>
+    <div class="hud-half"><div class="crosshair p2-color"></div></div>
+</div>
+
+<div id="overlay" onclick="requestLock()">
+    <h1>NEBULA MULTIPLAYER</h1>
+    <p style="opacity: 0.6;">P1: WASD + MOUSE | P2: ARROWS + ENTER</p>
+    <button class="start-btn">INITIALIZE COMBAT</button>
+</div>
+
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+}
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+
+    let scene, renderer, clock;
+    let players = [];
+    let obstacles = [], enemies = [], bullets = [];
+
+    const P_DATA = [
+        { id: 1, color: 0x00ff88, pos: new THREE.Vector3(-10, 2, 0), keys: {} },
+        { id: 2, color: 0xff0077, pos: new THREE.Vector3(10, 2, 0), keys: {} }
+    ];
+
+    init();
+
+    function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020205);
+        scene.fog = new THREE.FogExp2(0x020205, 0.04);
+        clock = new THREE.Clock();
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.autoClear = false; // Required for split-screen
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        scene.add(new THREE.AmbientLight(0x404040));
+        const sun = new THREE.DirectionalLight(0xffffff, 1);
+        sun.position.set(10, 20, 10);
+        scene.add(sun);
+
+        // Environment
+        createWorld();
+
+        // Setup 2 Players
+        P_DATA.forEach(data => {
+            const cam = new THREE.PerspectiveCamera(75, (window.innerWidth/2) / window.innerHeight, 0.1, 1000);
+            const body = new THREE.Group();
+            const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1, 4, 8), new THREE.MeshStandardMaterial({color: data.color}));
+            
+            body.add(cam);
+            body.add(mesh);
+            body.position.copy(data.pos);
+            scene.add(body);
+
+            players.push({
+                body: body,
+                camera: cam,
+                velocity: new THREE.Vector3(),
+                canJump: true,
+                yaw: new THREE.Object3D(),
+                pitch: new THREE.Object3D(),
+                data: data
+            });
+            body.add(players[players.length-1].yaw);
+            players[players.length-1].yaw.add(players[players.length-1].pitch);
+            players[players.length-1].pitch.add(cam);
+        });
+
+        setupControls();
+        for(let i=0; i<8; i++) spawnEnemy();
+        animate();
+    }
+
+    function createWorld() {
+        // Floor
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({color: 0x111111, roughness: 0.2}));
+        floor.rotation.x = -Math.PI/2;
+        scene.add(floor);
+
+        // Obstacles
+        for(let i=0; i<15; i++) {
+            const h = 5 + Math.random() * 10;
+            const obs = new THREE.Mesh(
+                new THREE.BoxGeometry(4, h, 4),
+                new THREE.MeshStandardMaterial({color: 0x333333, metalness: 0.8})
+            );
+            obs.position.set(Math.random()*80-40, h/2, Math.random()*80-40);
+            scene.add(obs);
+            obstacles.push(obs);
+        }
+    }
+
+    function setupControls() {
+        window.requestLock = () => {
+            document.body.requestPointerLock();
+            document.getElementById('overlay').style.display = 'none';
+        };
+
+        document.addEventListener('keydown', (e) => {
+            P_DATA[0].keys[e.code] = true;
+            P_DATA[1].keys[e.code] = true;
+            if(e.code === 'Enter') shoot(players[1]);
+        });
+        document.addEventListener('keyup', (e) => {
+            P_DATA[0].keys[e.code] = false;
+            P_DATA[1].keys[e.code] = false;
+        });
+        document.addEventListener('mousedown', () => { if(document.pointerLockElement) shoot(players[0]); });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement) {
+                players[0].yaw.rotation.y -= e.movementX * 0.002;
+                players[0].pitch.rotation.x -= e.movementY * 0.002;
+            }
+        });
+    }
+
+    function shoot(player) {
+        const b = new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({color: player.data.color}));
+        const dir = new THREE.Vector3(0,0,-1).applyQuaternion(player.camera.getWorldQuaternion(new THREE.Quaternion()));
+        b.position.copy(player.body.position).add(dir.clone().multiplyScalar(1));
+        b.userData = { dir: dir.multiplyScalar(1.5), owner: player };
+        scene.add(b);
+        bullets.push(b);
+    }
+
+    function spawnEnemy() {
+        const en = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), new THREE.MeshStandardMaterial({color: 0xffffff, emissive: 0xff0000}));
+        en.position.set(Math.random()*100-50, 0.6, Math.random()*100-50);
+        scene.add(en);
+        enemies.push(en);
+    }
+
+    function updatePlayer(p, dt) {
+        const keys = p.data.keys;
+        const vel = p.velocity;
+        
+        // P1 Controls (WASD) vs P2 (Arrows)
+        const forward = p.data.id === 1 ? keys['KeyW'] : keys['ArrowUp'];
+        const back = p.data.id === 1 ? keys['KeyS'] : keys['ArrowDown'];
+        const left = p.data.id === 1 ? keys['KeyA'] : keys['ArrowLeft'];
+        const right = p.data.id === 1 ? keys['KeyD'] : keys['ArrowRight'];
+
+        // Rotation for P2 (since no mouse)
+        if(p.data.id === 2) {
+            if(left) p.yaw.rotation.y += 3 * dt;
+            if(right) p.yaw.rotation.y -= 3 * dt;
+        }
+
+        vel.x -= vel.x * 10 * dt;
+        vel.z -= vel.z * 10 * dt;
+        
+        const moveDir = new THREE.Vector3();
+        if(p.data.id === 1) {
+            if(forward) moveDir.z -= 1; if(back) moveDir.z += 1;
+            if(left) moveDir.x -= 1; if(right) moveDir.x += 1;
+        } else {
+            if(forward) moveDir.z -= 1; if(back) moveDir.z += 1;
+        }
+
+        moveDir.applyQuaternion(p.yaw.quaternion).normalize();
+        vel.addScaledVector(moveDir, 120 * dt);
+
+        // Simple Obstacle Collision
+        const nextPos = p.body.position.clone().addScaledVector(vel, dt);
+        let collision = false;
+        obstacles.forEach(obj => {
+            if(nextPos.distanceTo(obj.position) < 3.5) collision = true;
+        });
+
+        if(!collision) {
+            p.body.position.x = nextPos.x;
+            p.body.position.z = nextPos.z;
+        }
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const dt = clock.getDelta();
+
+        players.forEach(p => updatePlayer(p, dt));
+
+        bullets.forEach((b, i) => {
+            b.position.add(b.userData.dir);
+            // Hit Enemies
+            enemies.forEach((en, ei) => {
+                if(b.position.distanceTo(en.position) < 1.5) {
+                    scene.remove(en); scene.remove(b);
+                    enemies.splice(ei, 1); bullets.splice(i, 1);
+                    spawnEnemy();
+                }
+            });
+            // Hit Obstacles
+            obstacles.forEach(obs => {
+                if(b.position.distanceTo(obs.position) < 2.5) {
+                    scene.remove(b); bullets.splice(i, 1);
+                }
+            });
+        });
+
+        // Split Screen Render
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+
+        renderer.setViewport(0, 0, w/2, h);
+        renderer.setScissor(0, 0, w/2, h);
+        renderer.setScissorTest(true);
+        renderer.render(scene, players[0].camera);
+
+        renderer.setViewport(w/2, 0, w/2, h);
+        renderer.setScissor(w/2, 0, w/2, h);
+        renderer.setScissorTest(true);
+        renderer.render(scene, players[1].camera);
+    }
+</script>
+</body>
+</html>

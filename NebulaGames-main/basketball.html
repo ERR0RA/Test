@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NEBULA B-BALL: MULTIVERSE PRO</title>
+    <style>
+        body { margin: 0; background: #03030d; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; color: white; font-family: 'Arial Black', sans-serif; user-select: none; }
+        #wrapper { position: relative; display: flex; align-items: center; justify-content: center; }
+        canvas { border: 4px solid #00ffff; border-radius: 16px; box-shadow: 0 0 50px rgba(0, 255, 255, 0.25); display: none; background: #06061a; }
+        
+        /* UI Layout */
+        #ui { position: absolute; top: 20px; display: none; justify-content: space-between; width: 950px; pointer-events: none; z-index: 10; }
+        .score-container { display: flex; flex-direction: column; align-items: center; width: 260px; background: rgba(5, 5, 25, 0.6); padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); backdrop-filter: blur(4px); }
+        .score { font-size: 72px; font-weight: 900; text-shadow: 0 0 20px currentColor; font-style: italic; margin: 0; line-height: 1; }
+        .bar-label { font-size: 10px; color: #888; align-self: flex-start; margin: 4px 0 1px 2px; letter-spacing: 1px; }
+        .bar-container { width: 100%; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; border: 1px solid rgba(255,255,255,0.15); }
+        .stamina-bar { height: 100%; width: 100%; transition: width 0.05s linear; }
+        .power-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #ff00ff, #00ffff); box-shadow: 0 0 12px #ff00ff; transition: width 0.1s ease; }
+        
+        #msg { position: absolute; top: 32%; width: 100%; text-align: center; font-size: 85px; font-weight: 900; color: #fff; text-shadow: 0 0 40px #ff00ff; display: none; pointer-events: none; z-index: 20; font-style: italic; letter-spacing: 6px; }
+        
+        /* Main Interactive Menu */
+        #menu { position: absolute; text-align: center; background: rgba(3, 3, 15, 0.96); padding: 45px; border: 3px solid #ff00ff; border-radius: 24px; box-shadow: 0 0 60px rgba(255, 0, 255, 0.35); z-index: 30; max-width: 520px; box-sizing: border-box; }
+        h1 { margin-top: 0; color: #00ffff; letter-spacing: 6px; font-size: 44px; text-shadow: 0 0 25px #00ffff; line-height: 1.1; }
+        .btn { display: block; width: 100%; padding: 18px; margin: 12px 0; background: linear-gradient(45deg, #nt-color, #ff00ff, #00ffff); background-size: 200% auto; background-image: linear-gradient(45deg, #ff00ff 0%, #00ffff 50%, #ff00ff 100%); border: none; color: #fff; font-family: 'Arial Black'; font-size: 15px; letter-spacing: 1px; cursor: pointer; transition: 0.3s; border-radius: 8px; text-shadow: 0 2px 4px rgba(0,0,0,0.6); box-shadow: 0 4px 15px rgba(0,255,255,0.2); }
+        .btn:hover { background-position: right center; transform: scale(1.03) translateY(-1px); box-shadow: 0 6px 22px rgba(255,0,255,0.45); }
+        .controls { font-size: 12px; color: #b5b5c5; margin-top: 25px; line-height: 1.6; text-align: left; background: rgba(255,255,255,0.04); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); font-family: 'Segoe UI', sans-serif; }
+        
+        /* Touch Device Layouts */
+        #touch-controls { position: absolute; bottom: 25px; width: 950px; display: none; justify-content: space-between; z-index: 40; pointer-events: none; box-sizing: border-box; padding: 0 10px; }
+        .touch-btn { width: 74px; height: 74px; background: rgba(255, 255, 255, 0.12); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 26px; pointer-events: auto; cursor: pointer; user-select: none; -webkit-user-select: none; }
+        .touch-btn:active { background: rgba(255,255,255,0.35); border-color: #00ffff; }
+        .control-group { display: flex; gap: 20px; pointer-events: auto; }
+    </style>
+</head>
+<body>
+
+<div id="wrapper">
+    <div id="menu">
+        <h1>NEBULA B-BALL<br><span style="font-size:22px; color:#ff00ff; letter-spacing:3px; vertical-align:super;">MULTIVERSE PRO</span></h1>
+        <button class="btn" onclick="startGame('P1_VS_BOT')">1 PLAYER (VS BOT)</button>
+        <button class="btn" onclick="startGame('P1_VS_P2')">2 PLAYERS (LOCAL)</button>
+        <button class="btn" onclick="startGame('BOT_VS_BOT')">BOT VS BOT (SPECTATE)</button>
+        <div class="controls">
+            <b>P1 (Red):</b> WASD keys | <b>DASH:</b> Double-Tap A / D | <b>SHOOT / SUPER:</b> Space<br>
+            <b>P2 (Blue):</b> IJKL keys | <b>DASH:</b> Double-Tap J / L | <b>SHOOT / SUPER:</b> Key 'O'<br>
+            <b>PRO TIPS:</b> Press down while running or jumping to manual-release shots. Slam direct dashes into structural carriers to break ball custody via Tackles!
+        </div>
+    </div>
+
+    <div id="ui">
+        <div class="score-container">
+            <div id="s1" class="score" style="color: #ff3e3e">0</div>
+            <div class="bar-label">ENERGY MATRIX</div>
+            <div class="bar-container"><div id="stamina1" class="stamina-bar" style="background:#ff3e3e"></div></div>
+            <div class="bar-label">NEBULA SUPER CHARGE</div>
+            <div class="bar-container"><div id="power1" class="power-bar"></div></div>
+        </div>
+        <div class="score-container">
+            <div id="s2" class="score" style="color: #00d2ff">0</div>
+            <div class="bar-label">ENERGY MATRIX</div>
+            <div class="bar-container"><div id="stamina2" class="stamina-bar" style="background:#00d2ff"></div></div>
+            <div class="bar-label">NEBULA SUPER CHARGE</div>
+            <div class="bar-container"><div id="power2" class="power-bar"></div></div>
+        </div>
+    </div>
+    
+    <div id="msg">GOAL!</div>
+    <canvas id="court"></canvas>
+
+    <div id="touch-controls">
+        <div class="control-group">
+            <div class="touch-btn" id="btn-left">◀</div>
+            <div class="touch-btn" id="btn-right">▶</div>
+        </div>
+        <div class="control-group">
+            <div class="touch-btn" id="btn-jump">▲</div>
+            <div class="touch-btn" id="btn-super" style="background:rgba(255, 0, 255, 0.25); border-color:#ff00ff; font-weight:bold;">★</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('court');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 1000; canvas.height = 600;
+
+    // Custom Synthesized Audio Engine Engine
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+
+        if (type === 'hit') {
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(160, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.08);
+            gain.gain.setValueAtTime(0.25, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.08);
+        } else if (type === 'tackle') {
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(120, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(20, audioCtx.currentTime + 0.25);
+            gain.gain.setValueAtTime(0.4, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+        } else if (type === 'score') {
+            osc.type = 'sine'; osc.frequency.setValueAtTime(350, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(900, audioCtx.currentTime + 0.45);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.45);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.45);
+        } else if (type === 'super') {
+            osc.type = 'square'; osc.frequency.setValueAtTime(500, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(1400, audioCtx.currentTime + 0.25);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+        }
+    }
+
+    let gameActive = false;
+    let scoringCooldown = false;
+    let screenShake = 0;
+    let gameMode = '';
+    const particles = [];
+    const stars = Array.from({length: 90}, () => ({x: Math.random()*1000, y: Math.random()*600, s: Math.random()*2.5+0.5, speed: Math.random()*0.4+0.05}));
+    
+    const gravity = 0.48;
+    const friction = 0.985;
+    const bounciness = 0.72;
+    const FLOOR_Y = 540;
+
+    let score1 = 0, score2 = 0;
+    const keys = {};
+
+    let lastTapA = 0, lastTapD = 0;
+    let lastTapJ = 0, lastTapL = 0;
+
+    // Hoop Configurations Featuring Spring Elastic Responses
+    const hoopLeft = { x: 50, y: 250, w: 55, h: 8, flexY: 0, vy: 0 };
+    const hoopRight = { x: 895, y: 250, w: 55, h: 8, flexY: 0, vy: 0 };
+
+    const ball = { 
+        x: 500, y: 150, vx: 4, vy: -2, r: 14, trail: [],
+        holder: null, lastHolder: null, freeTimer: 0,
+        reset(dir) {
+            this.x = 500; this.y = 160; this.vx = dir * 5; this.vy = -6;
+            this.trail = []; this.holder = null; this.lastHolder = null;
+            this.freeTimer = 100; scoringCooldown = false;
+        }
+    };
+
+    class Player {
+        constructor(x, color, team, controlType) {
+            this.x = x; this.y = 400; this.vx = 0; this.vy = 0;
+            this.w = 46; this.h = 85; this.color = color; this.team = team;
+            this.controlType = controlType;
+            this.grounded = false;
+            this.moveSpeed = 1.15;
+            this.maxSpeed = 8.5;
+            this.jumpForce = -14.5;
+            this.stunned = 0;
+            this.stamina = 100;
+            this.superMeter = 0;
+            this.dashCooldown = 0;
+            this.isSuperActive = false;
+            this.superTimer = 0;
+            this.shootReleased = true;
+        }
+
+        update(opponent) {
+            if (this.stunned > 0) { this.stunned--; this.vx *= 0.88; }
+            if (this.dashCooldown > 0) this.dashCooldown--;
+            if (this.stamina < 100 && this.stunned <= 0) this.stamina = Math.min(100, this.stamina + 0.45);
+            if (this.superMeter < 100 && !this.isSuperActive) this.superMeter = Math.min(100, this.superMeter + 0.06);
+
+            if (this.isSuperActive) {
+                this.superTimer--;
+                if (this.superTimer <= 0) { this.isSuperActive = false; this.maxSpeed = 8.5; }
+            }
+
+            let left = false, right = false, jump = false, actTrigger = false;
+
+            if (this.stunned <= 0) {
+                if (this.controlType === 'p1') {
+                    left = keys['KeyA']; right = keys['KeyD']; jump = keys['KeyW']; actTrigger = keys['Space'];
+                } else if (this.controlType === 'p2') {
+                    left = keys['KeyJ']; right = keys['KeyL']; jump = keys['KeyI']; actTrigger = keys['KeyO'];
+                } else if (this.controlType === 'bot') {
+                    // Optimized AI Positional Routines
+                    let targetX = ball.x;
+                    if (ball.holder === opponent) {
+                        targetX = opponent.x + (this.team === 1 ? -15 : 15);
+                        if (Math.abs(this.x - opponent.x) < 180 && this.stamina > 45 && this.dashCooldown === 0 && Math.random() < 0.06) {
+                            this.dash(Math.sign(opponent.x - this.x));
+                        }
+                    } else if (ball.holder === this) {
+                        let targetHoopX = this.team === 1 ? hoopRight.x : hoopLeft.x;
+                        targetX = targetHoopX + (this.team === 1 ? -90 : 90);
+                        
+                        // Smart Shot Trajectory Allocations
+                        let distanceToHoop = Math.abs(this.x - targetHoopX);
+                        if (distanceToHoop < 250 && Math.random() < 0.05) {
+                            this.performShot();
+                        } else if (distanceToHoop < 120 && this.y < 350) {
+                            this.performShot();
+                        }
+                    }
+                    
+                    if (Math.abs(targetX - this.x) > 10) {
+                        this.vx += Math.sign(targetX - this.x) * 0.7;
+                    }
+                    if (ball.holder !== this && ball.y < this.y - 60 && Math.abs(ball.x - this.x) < 80 && this.grounded && Math.random() < 0.1) {
+                        jump = true;
+                    }
+                    if (this.superMeter >= 100 && this.isSuperActive === false && Math.random() < 0.008) {
+                        this.useSuper();
+                    }
+                }
+
+                if (this.controlType !== 'bot') {
+                    if (left) this.vx -= this.moveSpeed;
+                    else if (right) this.vx += this.moveSpeed;
+                    else this.vx *= 0.82;
+
+                    if (actTrigger) {
+                        if (this.shootReleased) {
+                            if (this.superMeter >= 100 && !this.isSuperActive && ball.holder !== this) {
+                                this.useSuper();
+                            } else {
+                                this.performShot();
+                            }
+                            this.shootReleased = false;
+                        }
+                    } else {
+                        this.shootReleased = true;
+                    }
+                }
+                if (jump && this.grounded) { this.vy = this.jumpForce; this.grounded = false; playSound('hit'); }
+            }
+
+            // Standard Kinematics Environment Integration
+            this.vx = Math.max(-this.maxSpeed, Math.min(this.maxSpeed, this.vx));
+            this.vy += gravity; this.x += this.vx; this.y += this.vy;
+
+            if (this.y + this.h > FLOOR_Y) { this.y = FLOOR_Y - this.h; this.vy = 0; this.grounded = true; }
+            if (this.x < 0) this.x = 0; if (this.x + this.w > canvas.width) this.x = canvas.width - this.w;
+
+            // Structural Contact Checks
+            if (this !== ball.holder && ball.holder === opponent) {
+                if (Math.abs((this.x + this.w/2) - (opponent.x + opponent.w/2)) < 44 && Math.abs(this.y - opponent.y) < 82) {
+                    if (Math.abs(this.vx) > 11.5) {
+                        this.tackle(opponent);
+                    }
+                }
+            }
+
+            // Ball Capture Evaluation Boundaries
+            if (!scoringCooldown && this.stunned <= 0 && ball.freeTimer <= 0) {
+                if (ball.holder === null) {
+                    let cx = this.x + this.w/2;
+                    let cy = this.y + this.h/2;
+                    let dx = ball.x - cx, dy = ball.y - cy;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist < ball.r + 32) {
+                        ball.holder = this;
+                        ball.lastHolder = this;
+                        this.superMeter = Math.min(100, this.superMeter + 8);
+                        playSound('hit');
+                        spawnParticles(ball.x, ball.y, this.color, 10);
+                    }
+                } else if (ball.holder === this) {
+                    ball.x = this.x + this.w/2 + (this.team === 1 ? 24 : -24);
+                    ball.y = this.y + 15;
+                    
+                    // Dunk Velocity Check Loops
+                    let targetHoop = this.team === 1 ? hoopRight : hoopLeft;
+                    let distanceToRim = Math.sqrt(Math.pow(ball.x - (targetHoop.x + targetHoop.w/2), 2) + Math.pow(ball.y - targetHoop.y, 2));
+                    if (distanceToRim < 55) {
+                        this.performDunk(targetHoop);
+                    }
+                }
+            }
+
+            const prefix = this.team === 1 ? '1' : '2';
+            document.getElementById(`stamina${prefix}`).style.width = `${this.stamina}%`;
+            document.getElementById(`power${prefix}`).style.width = `${this.superMeter}%`;
+        }
+
+        dash(dir) {
+            if (this.stamina >= 35 && this.dashCooldown === 0) {
+                this.vx = dir * 16.5;
+                this.stamina -= 35;
+                this.dashCooldown = 22;
+                playSound('hit');
+                spawnParticles(this.x + this.w/2, this.y + this.h/2, "#00ffff", 14);
+            }
+        }
+
+        useSuper() {
+            this.superMeter = 0;
+            this.isSuperActive = true;
+            this.superTimer = 260;
+            this.maxSpeed = 13.5;
+            playSound('super');
+            screenShake = 14;
+            spawnParticles(this.x+this.w/2, this.y+this.h/2, "#ff00ff", 35);
+        }
+
+        performShot() {
+            if (ball.holder !== this) return;
+            ball.holder = null;
+            ball.freeTimer = 35; // Frames before recollection
+            
+            // Trajectory physics calculations 
+            let launchDir = this.team === 1 ? 1 : -1;
+            let baseAngleVelX = launchDir * (8.5 + Math.abs(this.vx) * 0.4);
+            let baseAngleVelY = -11.5 + (this.vy < 0 ? this.vy * 0.3 : 0);
+            
+            if (this.isSuperActive) {
+                baseAngleVelX *= 1.35;
+                baseAngleVelY *= 1.2;
+                spawnParticles(ball.x, ball.y, "#ff00ff", 15);
+            }
+
+            ball.vx = baseAngleVelX;
+            ball.vy = baseAngleVelY;
+            playSound('hit');
+        }
+
+        tackle(target) {
+            ball.holder = null;
+            ball.freeTimer = 40;
+            ball.vx = this.vx * 1.2; ball.vy = -6.5;
+            target.vx = this.vx * 1.05; target.vy = -5.5;
+            target.stunned = 48;
+            screenShake = 24;
+            playSound('tackle');
+            spawnParticles(target.x + 20, target.y + 40, "#ff0055", 30);
+        }
+
+        performDunk(hoop) {
+            if (scoringCooldown) return;
+            scoringCooldown = true;
+            hoop.vy = 14; // Elastic net flexing downward
+            
+            if (this.team === 1) { score1++; resetRound('s1', score1, -1, "METEOR DUNK!!"); }
+            else { score2++; resetRound('s2', score2, 1, "METEOR DUNK!!"); }
+            
+            screenShake = 40;
+            playSound('score');
+            spawnParticles(ball.x, ball.y, "#ff00ff", 50);
+            ball.holder = null;
+        }
+
+        draw() {
+            ctx.save();
+            ctx.translate(this.x + this.w/2, this.y + this.h/2);
+            
+            let rotationAngle = ball.holder === this ? (this.team === 1 ? 0.25 : -0.25) : this.vx * 0.025;
+            ctx.rotate(rotationAngle);
+
+            if (this.stunned > 0) ctx.filter = "brightness(2.5) grayscale(0.8)";
+            ctx.shadowBlur = this.isSuperActive ? 25 : 12;
+            ctx.shadowColor = this.isSuperActive ? "#ff00ff" : this.color;
+
+            // Mesh Decal Render Matrix
+            ctx.fillStyle = this.color;
+            ctx.fillRect(-this.w/2, -15, this.w, 40);
+            ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+            ctx.strokeRect(-this.w/2, -15, this.w, 40);
+
+            // Tech Helm Profiles
+            ctx.fillStyle = "#ffe4c4";
+            ctx.beginPath(); ctx.arc(0, -32, 16, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = this.isSuperActive ? "#ff00ff" : "#00ffff";
+            ctx.fillRect(this.team === 1 ? 0 : -14, -36, 14, 6); 
+
+            ctx.restore();
+        }
+    }
+
+    let t1, t2;
+
+    function startGame(mode) {
+        gameMode = mode;
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('ui').style.display = 'flex';
+        canvas.style.display = 'block';
+        
+        if(window.innerWidth < 1024 || 'ontouchstart' in window) {
+            document.getElementById('touch-controls').style.display = 'flex';
+        }
+
+        if (mode === 'P1_VS_BOT') { t1 = new Player(160, '#ff3e3e', 1, 'p1'); t2 = new Player(780, '#00d2ff', 2, 'bot'); }
+        else if (mode === 'P1_VS_P2') { t1 = new Player(160, '#ff3e3e', 1, 'p1'); t2 = new Player(780, '#00d2ff', 2, 'p2'); }
+        else { t1 = new Player(160, '#ff3e3e', 1, 'bot'); t2 = new Player(780, '#00d2ff', 2, 'bot'); }
+        
+        ball.reset(1);
+        gameActive = true;
+        loop();
+    }
+
+    window.onkeydown = e => {
+        keys[e.code] = true;
+        let timeStamp = performance.now();
+        if (e.code === 'KeyD') { if(timeStamp - lastTapD < 220) t1.dash(1); lastTapD = timeStamp; }
+        if (e.code === 'KeyA') { if(timeStamp - lastTapA < 220) t1.dash(-1); lastTapA = timeStamp; }
+        if (e.code === 'KeyL') { if(timeStamp - lastTapL < 220) t2.dash(1); lastTapL = timeStamp; }
+        if (e.code === 'KeyJ') { if(timeStamp - lastTapJ < 220) t2.dash(-1); lastTapJ = timeStamp; }
+    };
+    window.onkeyup = e => keys[e.code] = false;
+
+    const setupMobileButton = (id, keyCode) => {
+        const btn = document.getElementById(id);
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[keyCode] = true; });
+        btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[keyCode] = false; });
+    };
+    setupMobileButton('btn-left', 'KeyA');
+    setupMobileButton('btn-right', 'KeyD');
+    setupMobileButton('btn-jump', 'KeyW');
+    setupMobileButton('btn-super', 'Space');
+
+    function spawnParticles(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+            particles.push({ 
+                x, y, 
+                vx: (Math.random() - 0.5) * 13, 
+                vy: (Math.random() - 0.5) * 13, 
+                alpha: 1, color, 
+                r: Math.random() * 4.5 + 1 
+            });
+        }
+    }
+
+    function processRimBounce(bx, by, rx, ry, rw, rh) {
+        // Precise structural box AABB bounding calculations vs Ball parameters
+        let closestX = Math.max(rx, Math.min(bx, rx + rw));
+        let closestY = Math.max(ry, Math.min(by, ry + rh));
+        let distX = bx - closestX;
+        let distY = by - closestY;
+        let distRadius = Math.sqrt(distX * distX + distY * distY);
+
+        if (distRadius < ball.r) {
+            if (closestY === ry && ball.vy > 0) {
+                ball.vy *= -bounciness; ball.y = ry - ball.r;
+            } else if (closestY === ry + rh && ball.vy < 0) {
+                ball.vy *= -bounciness; ball.y = ry + rh + ball.r;
+            } else {
+                ball.vx *= -bounciness; ball.x = (bx > rx + rw/2) ? rx + rw + ball.r : rx - ball.r;
+            }
+            playSound('hit');
+            return true;
+        }
+        return false;
+    }
+
+    function loop() {
+        if (!gameActive) return;
+        
+        ctx.setTransform(1, 0, 0, 1, (Math.random()-0.5)*screenShake, (Math.random()-0.5)*screenShake);
+        screenShake *= 0.88;
+
+        // Render Field Arena 
+        let grad = ctx.createRadialGradient(500, 300, 30, 500, 300, 650);
+        grad.addColorStop(0, "#0a0a2c"); grad.addColorStop(1, "#03030f");
+        ctx.fillStyle = grad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.strokeStyle = "rgba(0, 255, 255, 0.035)"; ctx.lineWidth = 2;
+        for(let i=0; i<canvas.width; i+=40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, FLOOR_Y); ctx.stroke(); }
+        for(let j=0; j<FLOOR_Y; j+=40) { ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(canvas.width, j); ctx.stroke(); }
+
+        ctx.fillStyle = "rgba(255,255,255,0.6)"; 
+        stars.forEach(s => { s.x -= s.speed; if(s.x < 0) s.x = canvas.width; ctx.fillRect(s.x, s.y, s.s, s.s); });
+        
+        ctx.fillStyle = "#090a1c"; ctx.fillRect(0, FLOOR_Y, canvas.width, 60);
+        ctx.strokeStyle = "#ff00ff"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, FLOOR_Y); ctx.lineTo(canvas.width, FLOOR_Y); ctx.stroke();
+
+        // Update Operational Units
+        t1.update(t2); t2.update(t1);
+
+        // Hoop Physics Integrations
+        [hoopLeft, hoopRight].forEach(h => {
+            h.vy += (0 - h.flexY) * 0.14; // Hookean spring return equations
+            h.vy *= 0.88; h.flexY += h.vy;
+        });
+
+        // Core Physics Matrix Updates
+        if (!ball.holder) {
+            if (ball.freeTimer > 0) ball.freeTimer--;
+            ball.vy += gravity; ball.vx *= friction;
+            ball.x += ball.vx; ball.y += ball.vy;
+            
+            // Boundary Restraints Loops
+            if (ball.x < ball.r || ball.x > canvas.width - ball.r) { ball.vx *= -bounciness; ball.x = ball.x < ball.r ? ball.r : canvas.width - ball.r; playSound('hit'); }
+            if (ball.y < ball.r || ball.y + ball.r > FLOOR_Y) { ball.vy *= -bounciness; ball.y = ball.y < ball.r ? ball.r : FLOOR_Y - ball.r; playSound('hit'); }
+            
+            // Court Center Blockades
+            if (ball.x > 380 && ball.x < 620 && ball.y + ball.r > 340 && ball.y - ball.r < 355) {
+                ball.y = ball.vy > 0 ? 340 - ball.r : 355 + ball.r;
+                ball.vy *= -bounciness; playSound('hit');
+            }
+
+            // High Precision Rim Bounce Processing
+            processRimBounce(ball.x, ball.y, hoopLeft.x, hoopLeft.y + hoopLeft.flexY, hoopLeft.w, hoopLeft.h);
+            processRimBounce(ball.x, ball.y, hoopRight.x, hoopRight.y + hoopRight.flexY, hoopRight.w, hoopRight.h);
+
+            // Ring Score Threshold Vectors Validation Loops
+            if (!scoringCooldown && ball.vy > 0) {
+                if (ball.x > hoopLeft.x && ball.x < hoopLeft.x + hoopLeft.w && Math.abs(ball.y - hoopLeft.y) < 15) {
+                    scoringCooldown = true; score2++; hoopLeft.vy = 8;
+                    resetRound('s2', score2, 1, "DYNAMIC SWISH!!"); playSound('score');
+                }
+                if (ball.x > hoopRight.x && ball.x < hoopRight.x + hoopRight.w && Math.abs(ball.y - hoopRight.y) < 15) {
+                    scoringCooldown = true; score1++; hoopRight.vy = 8;
+                    resetRound('s1', score1, -1, "DYNAMIC SWISH!!"); playSound('score');
+                }
+            }
+        }
+
+        // Particle FX Blending Passes
+        ball.trail.push({x: ball.x, y: ball.y}); if (ball.trail.length > 22) ball.trail.shift();
+        ball.trail.forEach((p, i) => {
+            ctx.beginPath(); ctx.arc(p.x, p.y, ball.r * (i/22), 0, Math.PI*2);
+            ctx.fillStyle = ball.holder ? `rgba(255, 0, 255, ${i/45})` : `rgba(0, 255, 255, ${i/45})`; ctx.fill();
+        });
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx; p.y += p.vy; p.alpha -= 0.022;
+            ctx.globalAlpha = Math.max(0, p.alpha); ctx.fillStyle = p.color;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+            if (p.alpha <= 0) particles.splice(i, 1);
+        }
+        ctx.globalAlpha = 1;
+
+        // Render Reactive Goal Nets
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "#ff3e3e"; ctx.shadowBlur = 12; ctx.shadowColor = "#ff3e3e";
+        ctx.strokeRect(hoopLeft.x, hoopLeft.y + hoopLeft.flexY, hoopLeft.w, hoopLeft.h);
+        
+        ctx.strokeStyle = "#00d2ff"; ctx.shadowBlur = 12; ctx.shadowColor = "#00d2ff";
+        ctx.strokeRect(hoopRight.x, hoopRight.y + hoopRight.flexY, hoopRight.w, hoopRight.h);
+        ctx.shadowBlur = 0; 
+
+        t1.draw(); t2.draw();
+        
+        // Render Custom Basketball Orb Skin
+        let ballGrad = ctx.createRadialGradient(ball.x - 4, ball.y - 4, 1, ball.x, ball.y, ball.r);
+        ballGrad.addColorStop(0, ball.holder ? "#fff" : "#ffff33");
+        ballGrad.addColorStop(1, ball.holder ? "#ff00ff" : "#ff4500");
+        ctx.fillStyle = ballGrad;
+        ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
+
+        requestAnimationFrame(loop);
+    }
+
+    function resetRound(id, val, dir, text) {
+        document.getElementById(id).innerText = val;
+        const msg = document.getElementById('msg');
+        msg.innerText = text; msg.style.display = 'block';
+        setTimeout(() => { msg.style.display = 'none'; ball.reset(dir); }, 1500);
+    }
+</script>
+</body>
+</html>

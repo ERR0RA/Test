@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Neon Orbit Defender Co-op</title>
+<style>
+:root {
+  --cyan: #00f5ff;
+  --pink: #ff2bd6;
+  --lime: #7cff6b;
+  --gold: #ffd166;
+  --red: #ff355d;
+  --bg: #030612;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  font-family: Segoe UI, Arial, sans-serif;
+  color: #f4fbff;
+}
+body {
+  background:
+    radial-gradient(circle at 30% 20%, rgba(0,245,255,.20), transparent 34%),
+    radial-gradient(circle at 80% 70%, rgba(255,43,214,.18), transparent 36%),
+    linear-gradient(145deg, #02030a, #0b071a 55%, #020711);
+}
+canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+.ui {
+  position: fixed;
+  inset: 14px 14px auto 14px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.panel {
+  pointer-events: auto;
+  background: rgba(5,10,24,.78);
+  border: 1px solid rgba(0,245,255,.28);
+  border-radius: 8px;
+  box-shadow: 0 0 22px rgba(0,245,255,.14);
+  backdrop-filter: blur(10px);
+}
+.brand {
+  padding: 12px 14px;
+  max-width: 390px;
+}
+.brand h1 {
+  margin: 0;
+  color: var(--cyan);
+  font-size: 19px;
+  text-transform: uppercase;
+  text-shadow: 0 0 16px rgba(0,245,255,.8);
+}
+.brand p {
+  margin: 5px 0 0;
+  color: rgba(244,251,255,.72);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 92px);
+  gap: 8px;
+  padding: 9px;
+}
+.stat {
+  background: rgba(255,255,255,.045);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 7px;
+  padding: 8px;
+}
+.label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(244,251,255,.52);
+}
+.value {
+  font-size: 18px;
+  font-weight: 900;
+  margin-top: 2px;
+}
+.buttons {
+  padding: 9px;
+  display: flex;
+  gap: 8px;
+}
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 9px 11px;
+  font-weight: 900;
+  color: #031018;
+  background: linear-gradient(135deg, var(--cyan), var(--pink));
+  cursor: pointer;
+  box-shadow: 0 0 18px rgba(0,245,255,.24);
+}
+button.secondary {
+  background: rgba(255,255,255,.07);
+  color: #f4fbff;
+  border: 1px solid rgba(255,255,255,.14);
+}
+.help {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  max-width: 650px;
+  padding: 12px 14px;
+  font-size: 12px;
+  color: rgba(244,251,255,.75);
+  line-height: 1.45;
+  pointer-events: none;
+}
+.help strong { color: var(--lime); }
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0,0,0,.16);
+}
+.overlay.hidden { display: none; }
+.card {
+  width: min(640px, calc(100vw - 30px));
+  padding: 24px;
+  text-align: center;
+}
+.card h2 {
+  font-size: 34px;
+  color: var(--pink);
+  text-shadow: 0 0 18px rgba(255,43,214,.75);
+  margin: 0 0 8px;
+}
+.card p {
+  color: rgba(244,251,255,.78);
+  line-height: 1.55;
+  margin: 8px auto 18px;
+  max-width: 520px;
+}
+@media (max-width: 850px) {
+  .ui { display: grid; grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(4, 1fr); }
+  .buttons { justify-content: center; }
+  .brand { max-width: none; }
+  .help { right: 14px; }
+}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div class="ui">
+  <div class="panel brand">
+    <h1>Neon Orbit Defender Co-op</h1>
+    <p>Two orbit pilots guard one reactor. Rotate, dash, and fire neon lasers before the shards crack the core.</p>
+  </div>
+  <div class="panel stats">
+    <div class="stat"><div class="label">Score</div><div class="value" id="score">0</div></div>
+    <div class="stat"><div class="label">Wave</div><div class="value" id="wave">1</div></div>
+    <div class="stat"><div class="label">Core</div><div class="value" id="core">100</div></div>
+    <div class="stat"><div class="label">Combo</div><div class="value" id="combo">x1</div></div>
+  </div>
+  <div class="panel buttons">
+    <button id="start">Start</button>
+    <button id="restart" class="secondary">Restart</button>
+  </div>
+</div>
+<div class="panel help">
+  <strong>P1:</strong> A/D rotate, W fires, Shift dashes.
+  <strong>P2:</strong> Left/Right rotate, Up or Space fires, Enter dashes.
+  Destroy shards before they hit the reactor. Green sparks give both players rapid fire.
+</div>
+<div class="overlay" id="overlay">
+  <div class="panel card">
+    <h2>Co-op Core Defense</h2>
+    <p>Player 1 and Player 2 share the same reactor. Cover opposite sides of the orbit, chain combos, and survive as the shards speed up every wave.</p>
+    <button id="play">Play Co-op</button>
+  </div>
+</div>
+<script>
+'use strict';
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const ui = {
+  score: document.getElementById('score'),
+  wave: document.getElementById('wave'),
+  core: document.getElementById('core'),
+  combo: document.getElementById('combo'),
+  start: document.getElementById('start'),
+  restart: document.getElementById('restart'),
+  play: document.getElementById('play'),
+  overlay: document.getElementById('overlay')
+};
+
+const keys = new Set();
+const TAU = Math.PI * 2;
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+const state = {
+  w: 0,
+  h: 0,
+  cx: 0,
+  cy: 0,
+  r: 150,
+  running: false,
+  over: false,
+  score: 0,
+  wave: 1,
+  core: 100,
+  combo: 1,
+  comboT: 0,
+  time: 0,
+  spawn: 0,
+  rapid: 0,
+  shake: 0,
+  players: [],
+  shots: [],
+  shards: [],
+  bits: [],
+  sparks: [],
+  stars: []
+};
+
+function makePlayer(id, angle, color, fireKey, dashKey, leftKey, rightKey) {
+  return {
+    id,
+    angle,
+    vel: 0,
+    dash: 0,
+    fire: 0,
+    color,
+    fireKey,
+    dashKey,
+    leftKey,
+    rightKey
+  };
+}
+
+function resize() {
+  const d = Math.min(devicePixelRatio || 1, 2);
+  state.w = innerWidth;
+  state.h = innerHeight;
+  state.cx = state.w / 2;
+  state.cy = state.h / 2;
+  state.r = Math.min(state.w, state.h) * .26;
+  canvas.width = state.w * d;
+  canvas.height = state.h * d;
+  canvas.style.width = state.w + 'px';
+  canvas.style.height = state.h + 'px';
+  ctx.setTransform(d, 0, 0, d, 0, 0);
+  rebuildStars();
+}
+
+function rebuildStars() {
+  state.stars = [];
+  for (let i = 0; i < Math.floor(state.w * state.h / 9500); i++) {
+    state.stars.push({
+      x: rand(0, state.w),
+      y: rand(0, state.h),
+      r: rand(.5, 1.8),
+      h: rand(170, 320),
+      a: rand(.2, .8)
+    });
+  }
+}
+
+function reset(start = false) {
+  state.running = start;
+  state.over = false;
+  state.score = 0;
+  state.wave = 1;
+  state.core = 100;
+  state.combo = 1;
+  state.comboT = 0;
+  state.time = 0;
+  state.spawn = 0;
+  state.rapid = 0;
+  state.shake = 0;
+  state.players = [
+    makePlayer(1, -Math.PI / 2, '#00f5ff', 'KeyW', 'ShiftLeft', 'KeyA', 'KeyD'),
+    makePlayer(2, Math.PI / 2, '#ff2bd6', 'ArrowUp', 'Enter', 'ArrowLeft', 'ArrowRight')
+  ];
+  state.shots = [];
+  state.shards = [];
+  state.bits = [];
+  state.sparks = [];
+  ui.overlay.classList.toggle('hidden', start);
+  ui.overlay.querySelector('h2').textContent = 'Co-op Core Defense';
+  ui.overlay.querySelector('p').textContent = 'Player 1 and Player 2 share the same reactor. Cover opposite sides of the orbit, chain combos, and survive as the shards speed up every wave.';
+  sync();
+}
+
+function start() {
+  reset(true);
+  ui.overlay.classList.add('hidden');
+}
+
+function sync() {
+  ui.score.textContent = state.score;
+  ui.wave.textContent = state.wave;
+  ui.core.textContent = Math.max(0, Math.ceil(state.core));
+  ui.combo.textContent = 'x' + state.combo;
+}
+
+function pos(angle, r = state.r) {
+  return {
+    x: state.cx + Math.cos(angle) * r,
+    y: state.cy + Math.sin(angle) * r
+  };
+}
+
+function spawnShard() {
+  const a = rand(0, TAU);
+  const far = Math.max(state.w, state.h) * .62;
+  const p = pos(a, far);
+  const hp = Math.random() < .18 + state.wave * .01 ? 2 : 1;
+  state.shards.push({
+    x: p.x,
+    y: p.y,
+    a,
+    spd: rand(42, 72) + state.wave * 8,
+    r: hp > 1 ? 18 : 13,
+    hp,
+    hue: hp > 1 ? 330 : 190,
+    spin: rand(-4, 4)
+  });
+}
+
+function burst(x, y, hue, n = 18) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU);
+    const s = rand(1, 7);
+    state.bits.push({
+      x,
+      y,
+      vx: Math.cos(a) * s,
+      vy: Math.sin(a) * s,
+      life: rand(.3, .8),
+      max: .8,
+      hue,
+      r: rand(1.5, 4)
+    });
+  }
+}
+
+function fire(player) {
+  if (player.fire > 0) return;
+  const p = pos(player.angle, state.r);
+  const hue = state.rapid > 0 ? 115 : (player.id === 1 ? 185 : 315);
+  state.shots.push({
+    x: p.x,
+    y: p.y,
+    vx: Math.cos(player.angle) * 760,
+    vy: Math.sin(player.angle) * 760,
+    life: .75,
+    hue,
+    owner: player.id
+  });
+  player.fire = state.rapid > 0 ? .055 : .16;
+  burst(p.x, p.y, hue, 6);
+}
+
+function updatePlayer(player, dt) {
+  player.fire -= dt;
+  player.dash -= dt;
+  let dir = 0;
+  if (keys.has(player.leftKey)) dir--;
+  if (keys.has(player.rightKey)) dir++;
+  player.vel = (player.vel + dir * 12 * dt) * .84;
+  if (keys.has(player.dashKey) && player.dash <= 0) {
+    player.vel += dir ? dir * 7 : 7;
+    player.dash = .75;
+  }
+  player.angle = (player.angle + player.vel * dt + TAU) % TAU;
+  if (keys.has(player.fireKey) || (player.id === 2 && keys.has('Space'))) {
+    fire(player);
+  }
+}
+
+function update(dt) {
+  if (!state.running) return;
+  state.time += dt;
+  state.spawn -= dt;
+  state.comboT -= dt;
+  state.rapid -= dt;
+  if (state.comboT <= 0) state.combo = 1;
+  for (const player of state.players) updatePlayer(player, dt);
+  if (state.spawn <= 0) {
+    spawnShard();
+    state.spawn = Math.max(.16, .82 - state.wave * .045);
+  }
+  for (let i = state.shots.length - 1; i >= 0; i--) {
+    const s = state.shots[i];
+    s.life -= dt;
+    s.x += s.vx * dt;
+    s.y += s.vy * dt;
+    if (s.life <= 0 || s.x < -50 || s.x > state.w + 50 || s.y < -50 || s.y > state.h + 50) {
+      state.shots.splice(i, 1);
+    }
+  }
+  for (let i = state.shards.length - 1; i >= 0; i--) {
+    const sh = state.shards[i];
+    const dx = state.cx - sh.x;
+    const dy = state.cy - sh.y;
+    const d = Math.hypot(dx, dy) || 1;
+    sh.x += dx / d * sh.spd * dt;
+    sh.y += dy / d * sh.spd * dt;
+    sh.a += sh.spin * dt;
+    if (d < 38) {
+      state.core -= sh.hp * 9;
+      state.shake = 16;
+      burst(sh.x, sh.y, 0, 26);
+      state.shards.splice(i, 1);
+      if (state.core <= 0) end();
+      continue;
+    }
+    for (let j = state.shots.length - 1; j >= 0; j--) {
+      const s = state.shots[j];
+      if (Math.hypot(s.x - sh.x, s.y - sh.y) < sh.r + 6) {
+        state.shots.splice(j, 1);
+        sh.hp--;
+        burst(s.x, s.y, s.hue, 10);
+        if (sh.hp <= 0) {
+          state.score += 10 * state.combo;
+          state.combo = clamp(state.combo + 1, 1, 9);
+          state.comboT = 2.2;
+          if (Math.random() < .12) state.sparks.push({ x: sh.x, y: sh.y, life: 7 });
+          burst(sh.x, sh.y, sh.hue, 24);
+          state.shards.splice(i, 1);
+          if (state.score > state.wave * 180) {
+            state.wave++;
+            state.core = clamp(state.core + 12, 0, 100);
+          }
+        }
+        break;
+      }
+    }
+  }
+  for (let i = state.sparks.length - 1; i >= 0; i--) {
+    const sp = state.sparks[i];
+    sp.life -= dt;
+    let collected = false;
+    for (const player of state.players) {
+      const pp = pos(player.angle, state.r);
+      if (Math.hypot(pp.x - sp.x, pp.y - sp.y) < 30) collected = true;
+    }
+    if (collected) {
+      state.rapid = 5;
+      burst(sp.x, sp.y, 115, 30);
+      state.sparks.splice(i, 1);
+    } else if (sp.life <= 0) {
+      state.sparks.splice(i, 1);
+    }
+  }
+  for (let i = state.bits.length - 1; i >= 0; i--) {
+    const b = state.bits[i];
+    b.life -= dt;
+    b.x += b.vx;
+    b.y += b.vy;
+    b.vx *= .96;
+    b.vy *= .96;
+    if (b.life <= 0) state.bits.splice(i, 1);
+  }
+  state.shake = Math.max(0, state.shake - 50 * dt);
+  sync();
+}
+
+function end() {
+  state.running = false;
+  state.over = true;
+  ui.overlay.classList.remove('hidden');
+  ui.overlay.querySelector('h2').textContent = 'Core Breached';
+  ui.overlay.querySelector('p').textContent = 'Final score: ' + state.score + '. Restart and tighten the co-op orbit.';
+}
+
+function glow(x, y, r, color, a = 1) {
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = r * 1.5;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, state.w, state.h);
+  ctx.save();
+  if (state.shake > 0) ctx.translate(rand(-state.shake, state.shake), rand(-state.shake, state.shake));
+  for (const s of state.stars) {
+    ctx.fillStyle = 'hsla(' + s.h + ',100%,70%,' + s.a + ')';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, TAU);
+    ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(0,245,255,.08)';
+  ctx.lineWidth = 1;
+  for (let r = 80; r < Math.max(state.w, state.h); r += 70) {
+    ctx.beginPath();
+    ctx.arc(state.cx, state.cy, r, 0, TAU);
+    ctx.stroke();
+  }
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0,245,255,.5)';
+  ctx.shadowColor = '#00f5ff';
+  ctx.shadowBlur = 18;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(state.cx, state.cy, state.r, 0, TAU);
+  ctx.stroke();
+  ctx.restore();
+  glow(state.cx, state.cy, 34, state.core > 35 ? '#00f5ff' : '#ff355d', .95);
+  ctx.strokeStyle = state.core > 35 ? '#7cff6b' : '#ff355d';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.arc(state.cx, state.cy, 48, -Math.PI / 2, -Math.PI / 2 + TAU * (state.core / 100));
+  ctx.stroke();
+  for (const sp of state.sparks) {
+    glow(sp.x, sp.y, 10, '#7cff6b', .9);
+    ctx.strokeStyle = '#7cff6b';
+    ctx.strokeRect(sp.x - 13, sp.y - 13, 26, 26);
+  }
+  for (const sh of state.shards) {
+    ctx.save();
+    ctx.translate(sh.x, sh.y);
+    ctx.rotate(sh.a);
+    const col = 'hsl(' + sh.hue + ',100%,60%)';
+    ctx.strokeStyle = col;
+    ctx.fillStyle = col;
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 16;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, -sh.r);
+    ctx.lineTo(sh.r, 0);
+    ctx.lineTo(0, sh.r);
+    ctx.lineTo(-sh.r, 0);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.globalAlpha = .35;
+    ctx.fill();
+    ctx.restore();
+  }
+  for (const s of state.shots) glow(s.x, s.y, 5, 'hsl(' + s.hue + ',100%,60%)', .95);
+  for (const player of state.players) drawPlayer(player);
+  for (const b of state.bits) glow(b.x, b.y, b.r, 'hsl(' + b.hue + ',100%,62%)', Math.max(0, b.life / b.max));
+  ctx.restore();
+}
+
+function drawPlayer(player) {
+  const pp = pos(player.angle, state.r);
+  ctx.save();
+  ctx.translate(pp.x, pp.y);
+  ctx.rotate(player.angle + Math.PI / 2);
+  ctx.fillStyle = state.rapid > 0 ? '#7cff6b' : player.color;
+  ctx.shadowColor = ctx.fillStyle;
+  ctx.shadowBlur = 22;
+  ctx.beginPath();
+  ctx.moveTo(0, -24);
+  ctx.lineTo(17, 18);
+  ctx.lineTo(0, 10);
+  ctx.lineTo(-17, 18);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#031018';
+  ctx.font = '900 13px Segoe UI';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('P' + player.id, 0, 4);
+  ctx.restore();
+}
+
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(.033, (now - last) / 1000);
+  last = now;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+addEventListener('resize', resize);
+addEventListener('keydown', e => {
+  keys.add(e.code);
+  if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space','Enter'].includes(e.code)) e.preventDefault();
+});
+addEventListener('keyup', e => keys.delete(e.code));
+ui.start.onclick = start;
+ui.play.onclick = start;
+ui.restart.onclick = () => reset(true);
+resize();
+reset(false);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

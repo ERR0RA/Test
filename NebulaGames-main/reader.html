@@ -1,0 +1,61 @@
+<div class="main-engine">
+    <h1 style="color: #ff00ff;">PROBABILITY.ENGINE_v2.0</h1>
+    
+    <div class="input-group">
+        <label>Extract Snippet (Type 2-3 key sentences)</label>
+        <textarea id="extractSource" placeholder="Type the part of the story you think has the answer..."></textarea>
+    </div>
+
+    <div class="choice-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <input type="text" id="o1" class="choice-input" placeholder="Option A">
+        <input type="text" id="o2" class="choice-input" placeholder="Option B">
+        <input type="text" id="o3" class="choice-input" placeholder="Option C">
+        <input type="text" id="o4" class="choice-input" placeholder="Option D">
+    </div>
+
+    <button class="btn-solve" style="background: #ff00ff;" onclick="calculateBestFit()">CALCULATE PROBABILITY</button>
+
+    <div id="probResult" style="display:none; margin-top: 20px; padding: 15px; background: rgba(255,0,255,0.1); border: 1px solid #ff00ff; border-radius: 12px;">
+        <h4 id="winnerOption" style="color: #ff00ff; font-size: 1.1rem;"></h4>
+        <p id="confidenceLevel" style="font-size: 0.7rem; color: #888; margin-top: 5px;"></p>
+    </div>
+</div>
+
+<script>
+function calculateBestFit() {
+    const source = document.getElementById('extractSource').value.toLowerCase();
+    const options = [
+        document.getElementById('o1').value,
+        document.getElementById('o2').value,
+        document.getElementById('o3').value,
+        document.getElementById('o4').value
+    ];
+
+    let scores = [0, 0, 0, 0];
+
+    options.forEach((opt, index) => {
+        if (!opt) return;
+        const words = opt.toLowerCase().split(' ');
+        
+        words.forEach(word => {
+            if (word.length < 3) return; // Skip small words
+            // Check for direct match
+            if (source.includes(word)) scores[index] += 10;
+            // Check for partial match (root words)
+            if (source.includes(word.substring(0, 4))) scores[index] += 5;
+        });
+    });
+
+    const highestScore = Math.max(...scores);
+    const winnerIndex = scores.indexOf(highestScore);
+    const resultBox = document.getElementById('probResult');
+
+    if (highestScore > 0) {
+        resultBox.style.display = 'block';
+        document.getElementById('winnerOption').innerText = "BEST FIT: " + options[winnerIndex];
+        document.getElementById('confidenceLevel').innerText = "CONFIDENCE: " + Math.min(highestScore * 2, 99) + "% BASED ON LINGUISTIC OVERLAP";
+    } else {
+        alert("No clear match found. Try typing a different part of the extract!");
+    }
+}
+</script>

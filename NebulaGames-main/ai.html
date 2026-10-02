@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NEXUS-3D | Stable Protocol</title>
+    <style>
+        body { margin: 0; background: #000; color: #0f0; font-family: 'Courier New', monospace; overflow: hidden; }
+        #container { display: flex; width: 100vw; height: 100vh; }
+        canvas.view { width: 100%; height: 100%; image-rendering: pixelated; background: #000; }
+
+        #minimap {
+            position: absolute; top: 15px; left: 15px;
+            border: 1px solid #0f0; background: rgba(0,0,0,0.9); z-index: 30;
+            display: none;
+        }
+
+        .overlay {
+            position: fixed; inset: 0; display: flex; justify-content: center; align-items: center;
+            background: #000; z-index: 100; text-align: center;
+        }
+
+        .menu-box { border: 2px solid #0f0; padding: 30px; background: #050505; box-shadow: 0 0 15px #004400; }
+        .btn { background: #0f0; color: #000; border: none; padding: 12px 25px; margin: 8px; cursor: pointer; font-weight: bold; width: 280px; display: block; font-family: monospace; }
+        .btn:hover { background: #fff; }
+
+        #timer-box {
+            position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.8);
+            padding: 10px; border: 1px solid #f00; color: #f00; font-weight: bold;
+            display: none; z-index: 40;
+        }
+
+        #hud {
+            position: absolute; bottom: 15px; width: 100%; display: none;
+            配送 justify-content: center; pointer-events: none; z-index: 40; gap: 20px;
+        }
+
+        .stats { background: rgba(0,0,0,0.8); padding: 5px 15px; border: 1px solid #0f0; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+<div id="timer-box">EXTRACTION IN: <span id="clock">04:00</span></div>
+
+<div id="container">
+    <canvas id="p1Cam" class="view"></canvas>
+</div>
+
+<canvas id="minimap" width="110" height="110"></canvas>
+
+<div id="main-menu" class="overlay">
+    <div class="menu-box">
+        <h1>NEXUS_SINGLE_PLAYER</h1>
+        <button class="btn" onclick="init('bot')">SOLO SURVIVAL (1v2 SENTINELS)</button>
+        <button class="btn" onclick="init('bot_tag')">SOLO TAG (RANDOM ROLES)</button>
+        <p id="best-display" style="color:#0f0; font-size: 0.8rem; margin: 10px 0;">BEST SURVIVAL: 0s</p>
+        <p style="color:#00ff00; font-size: 0.7rem; margin-top:10px; font-weight:bold;">SENSORS TUNED: NO HP / INSTANT TAG</p>
+    </div>
+</div>
+
+<div id="hud">
+    <div id="tagger-status" class="stats" style="color: #f00; font-weight: bold;">STATUS: STANDBY</div>
+    <div id="record-status" class="stats" style="color: #0f0;">BEST: 0s</div>
+</div>
+
+<script>
+const p1c = document.getElementById('p1Cam');
+const ctx1 = p1c.getContext('2d');
+const mCtx = document.getElementById('minimap').getContext('2d');
+
+const SIZE = 31;
+const START_TIME = 240;
+let world = [];
+let active = false;
+let gameMode = '';
+let timeLeft = START_TIME;
+let megaSpawned = false;
+let timerId = null;
+let animationId = null;
+
+// High Score Setup
+let bestSurvival = localStorage.getItem('nexus_best_survival') || 0;
+document.getElementById('best-display').innerText = `BEST SURVIVAL: ${bestSurvival}s`;
+document.getElementById('record-status').innerText = `BEST: ${bestSurvival}s`;
+
+const keys = new Set();
+let p1 = { x: 1.5, y: 1.5, dir: 0, role: 'runner' };
+let bots = [];
+
+window.addEventListener('keydown', e => {
+    keys.add(e.code);
+    if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","KeyW","KeyS","KeyA","KeyD"].includes(e.code)) e.preventDefault();
+}, { passive: false });
+
+window.addEventListener('keyup', e => keys.delete(e.code));
+function clearKeys() { keys.clear(); }
+window.addEventListener('blur', clearKeys);
+
+function generateMaze() {
+    world = Array(SIZE).fill().map(() => Array(SIZE).fill(1));
+    function walk(x, y) {
+        world[y][x] = 0;
+        let dirs = [[0,-2],[0,2],[-2,0],[2,0]].sort(() => Math.random() - 0.5);
+        for (let [dx, dy] of dirs) {
+            let nx = x + dx, ny = y + dy;
+            if (nx > 0 && nx < SIZE && ny > 0 && ny < SIZE && world[ny][nx] === 1) {
+                world[y + dy / 2][x + dx / 2] = 0;
+                walk(nx, ny);
+            }
+        }
+    }
+    walk(1, 1);
+}
+
+function getNextStep(bx, by, tx, ty) {
+    let sx = Math.floor(bx), sy = Math.floor(by), ex = Math.floor(tx), ey = Math.floor(ty);
+    if (sx === ex && sy === ey) return { x: tx, y: ty };
+    let q = [[sx, sy]], vis = new Set([sx + ',' + sy]), parent = {};
+    while (q.length > 0) {
+        let [cx, cy] = q.shift();
+        if (cx === ex && cy === ey) break;
+        for (let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            let nx = cx + dx, ny = cy + dy, id = nx + ',' + ny;
+            if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && world[ny][nx] === 0 && !vis.has(id)) {
+                vis.add(id); parent[id] = [cx, cy]; q.push([nx, ny]);
+            }
+        }
+    }
+    let path = [], curr = ex + ',' + ey;
+    while (parent[curr]) { path.push(curr); curr = parent[curr][0] + ',' + parent[curr][1]; }
+    if (path.length === 0) return { x: bx, y: by };
+    let n = path.pop().split(',').map(Number);
+    return { x: n[0] + 0.5, y: n[1] + 0.5 };
+}
+
+function canMove(nx, ny) { return world[Math.floor(ny)] && world[Math.floor(ny)][Math.floor(nx)] === 0; }
+
+function movePlayer(p, speed, rotSpeed) {
+    if (keys.has('KeyA') || keys.has('ArrowLeft')) p.dir -= rotSpeed;
+    if (keys.has('KeyD') || keys.has('ArrowRight')) p.dir += rotSpeed;
+    let moveX = 0, moveY = 0;
+    if (keys.has('KeyW') || keys.has('ArrowUp')) {
+        moveX = Math.cos(p.dir) * speed; moveY = Math.sin(p.dir) * speed;
+    } else if (keys.has('KeyS') || keys.has('ArrowDown')) {
+        moveX = -Math.cos(p.dir) * speed; moveY = -Math.sin(p.dir) * speed;
+    }
+    if (canMove(p.x + moveX, p.y)) p.x += moveX;
+    if (canMove(p.x, p.y + moveY)) p.y += moveY;
+}
+
+function checkSurvivalRecord() {
+    if (gameMode === 'bot') {
+        let survived = START_TIME - timeLeft;
+        if (survived > bestSurvival) {
+            bestSurvival = survived;
+            localStorage.setItem('nexus_best_survival', bestSurvival);
+            return true;
+        }
+    }
+    return false;
+}
+
+function endGame(msg) {
+    active = false;
+    let isNewRecord = checkSurvivalRecord();
+    let finalMsg = isNewRecord ? msg + "\nNEW SURVIVAL RECORD: " + bestSurvival + "s" : msg;
+    alert(finalMsg);
+    location.reload();
+}
+
+function init(m) {
+    gameMode = m; generateMaze(); clearKeys();
+    active = true; timeLeft = START_TIME; megaSpawned = false; bots = [];
+    p1 = { x: 1.5, y: 1.5, dir: 0, role: 'runner' };
+
+    if (timerId) clearInterval(timerId);
+    if (animationId) cancelAnimationFrame(animationId);
+
+    document.getElementById('main-menu').style.display = 'none';
+    document.getElementById('minimap').style.display = 'block';
+    document.getElementById('hud').style.display = 'flex';
+    document.getElementById('timer-box').style.display = 'block';
+    
+    // Hide record if not in survival mode
+    document.getElementById('record-status').style.display = (m === 'bot') ? 'block' : 'none';
+
+    if (m === 'bot_tag') {
+        let botIsTagger = Math.random() > 0.5;
+        p1.role = botIsTagger ? 'runner' : 'tagger';
+        bots = [{ x: SIZE - 1.5, y: SIZE - 1.5, s: 0.045, role: botIsTagger ? 'tagger' : 'runner', type: 'normal' }];
+        document.getElementById('tagger-status').innerText = `TAGGER: ${botIsTagger ? 'ELITE BOT' : 'YOU'}`;
+    } else if (m === 'bot') {
+        bots = [
+            { x: 1.5, y: SIZE - 1.5, s: 0.025, role: 'tagger', type: 'normal' },
+            { x: SIZE - 1.5, y: 1.5, s: 0.025, role: 'tagger', type: 'normal' }
+        ];
+        document.getElementById('tagger-status').innerText = 'TAGGER: SENTINELS';
+    }
+
+    timerId = setInterval(() => {
+        if (!active) return;
+        timeLeft--;
+        if (gameMode === 'bot' && timeLeft <= 90 && !megaSpawned) {
+            megaSpawned = true;
+            bots.push({ x: 15.5, y: 15.5, s: 0.048, role: 'tagger', type: 'mega' });
+            document.getElementById('tagger-status').innerText = 'WARNING: MEGA BOT ACTIVE';
+        }
+        let min = Math.floor(timeLeft / 60), sec = timeLeft % 60;
+        document.getElementById('clock').innerText = `${min}:${sec < 10 ? '0' + sec : sec}`;
+        if (timeLeft <= 0) { endGame('EXTRACTION SUCCESSFUL: YOU SURVIVED'); }
+    }, 1000);
+    resize(); loop();
+}
+
+function resize() { p1c.width = window.innerWidth; p1c.height = window.innerHeight; }
+window.addEventListener('resize', resize);
+
+function render(ctx, p, canvas) {
+    const w = canvas.width, h = canvas.height;
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h / 2);
+    ctx.fillStyle = '#050505'; ctx.fillRect(0, h / 2, w, h / 2);
+    let zBuf = new Array(w).fill(30);
+    for (let i = 0; i < w; i++) {
+        let camX = 2 * i / w - 1;
+        let rayDirX = Math.cos(p.dir + camX * 0.6), rayDirY = Math.sin(p.dir + camX * 0.6);
+        let d = 0, hit = false, exactX = p.x, exactY = p.y;
+        while (!hit && d < 20) {
+            d += 0.02; exactX = p.x + rayDirX * d; exactY = p.y + rayDirY * d;
+            let tx = Math.floor(exactX), ty = Math.floor(exactY);
+            if (world[ty] && world[ty][tx] === 1) hit = true;
+        }
+        let correctedD = Math.max(0.001, d * Math.cos(camX * 0.6));
+        zBuf[i] = correctedD;
+        let wallH = h / correctedD;
+        ctx.fillStyle = '#004400'; ctx.fillRect(i, h / 2 - wallH / 2, 1, wallH);
+        let fx = exactX % 1, fy = exactY % 1;
+        if (fx < 0.03 || fx > 0.97 || fy < 0.03 || fy > 0.97) {
+            ctx.fillStyle = '#006600'; ctx.fillRect(i, h / 2 - wallH / 2, 1, wallH);
+        }
+    }
+    bots.forEach(t => {
+        let dx = t.x - p.x, dy = t.y - p.y, dist = Math.hypot(dx, dy);
+        if (dist < 0.1) return;
+        let angle = Math.atan2(dy, dx) - p.dir;
+        while (angle < -Math.PI) angle += Math.PI * 2;
+        while (angle > Math.PI) angle -= Math.PI * 2;
+        if (Math.abs(angle) < 0.8) {
+            let sx = (angle / 1.2 + 0.5) * w, sh = h / dist, ix = Math.floor(sx);
+            if (ix >= 0 && ix < zBuf.length && dist < zBuf[ix]) {
+                ctx.fillStyle = (t.type === 'mega') ? '#ff0000' : (t.role === 'tagger' ? '#f55' : '#0f0');
+                let botWidth = (t.type === 'mega') ? sh / 2 : sh / 4;
+                ctx.fillRect(sx - botWidth / 2, h / 2 - sh / 2, botWidth, sh);
+            }
+        }
+    });
+}
+
+function updateBots() {
+    bots.forEach(b => {
+        let dist = Math.hypot(p1.x - b.x, p1.y - b.y);
+        if (dist < 0.45) {
+            if (b.role === 'tagger') {
+                endGame(b.type === 'mega' ? 'CRUSHED BY MEGA BOT!' : 'TAGGED BY SENTINEL!');
+            } else if (gameMode === 'bot_tag' && p1.role === 'tagger') {
+                endGame('YOU TAGGED THE BOT! VICTORY');
+            }
+        } else {
+            let next = getNextStep(b.x, b.y, p1.x, p1.y);
+            let dx = next.x - b.x, dy = next.y - b.y, d = Math.hypot(dx, dy);
+            if (d > 0.01) { b.x += (dx / d) * b.s; b.y += (dy / d) * b.s; }
+        }
+    });
+}
+
+function drawMinimap() {
+    mCtx.clearRect(0, 0, 110, 110);
+    let s = 110 / SIZE;
+    for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+            if (world[y][x]) { mCtx.fillStyle = '#002200'; mCtx.fillRect(x * s, y * s, s, s); }
+        }
+    }
+    mCtx.fillStyle = p1.role === 'tagger' ? '#f00' : '#00ff00';
+    mCtx.fillRect(p1.x * s - 1.5, p1.y * s - 1.5, 3, 3);
+    bots.forEach(b => {
+        mCtx.fillStyle = (b.type === 'mega') ? '#f00' : (b.role === 'runner' ? '#0f0' : '#f55');
+        let sz = (b.type === 'mega') ? 5 : 3;
+        mCtx.fillRect(b.x * s - sz/2, b.y * s - sz/2, sz, sz);
+    });
+}
+
+function loop() {
+    if (!active) return;
+    movePlayer(p1, 0.05, 0.06);
+    updateBots();
+    render(ctx1, p1, p1c);
+    drawMinimap();
+    animationId = requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

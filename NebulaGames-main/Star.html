@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Star Dodger - 2 Player Edition</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      align-items: center;
+      background: radial-gradient(circle at top, #243b67, #090d1c 70%);
+      color: #f5f7ff;
+      display: flex;
+      font-family: system-ui, sans-serif;
+      justify-content: center;
+      margin: 0;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .game { max-width: 860px; text-align: center; width: 100%; }
+    h1 { font-size: clamp(2rem, 7vw, 3.5rem); margin: 0 0 6px; }
+    p { color: #aeb9dc; margin: 0 0 16px; }
+    .hud { display: flex; justify-content: space-around; margin: 0 auto 10px; max-width: 800px; }
+    .stat { background: #151d38cc; border: 1px solid #3a4a7a; border-radius: 10px; padding: 8px 16px; }
+    canvas {
+      background: #070b19;
+      border: 2px solid #5d75c7;
+      border-radius: 14px;
+      box-shadow: 0 0 35px #1c54a866;
+      display: block;
+      height: auto;
+      margin: auto;
+      max-width: 100%;
+      touch-action: none;
+    }
+    .controls { margin-top: 14px; display: flex; justify-content: center; gap: 12px; }
+    button {
+      background: #6d5dfc; border: 0; border-radius: 9px; color: white;
+      cursor: pointer; font-size: 1rem; font-weight: 700;
+      padding: 11px 24px;
+    }
+    button:hover { background: #8174ff; }
+    .hint { font-size: .9rem; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <h1>⭐ Star Dodger</h1>
+    <p>Move your ship, collect stars, and dodge falling rocks.</p>
+    <div class="hud">
+      <div class="stat">P1 Score: <strong id="p1-score">0</strong></div>
+      <div class="stat" id="p2-stat" style="display:none;">P2 Score: <strong id="p2-score">0</strong></div>
+      <div class="stat">Best: <strong id="best">0</strong></div>
+    </div>
+    <canvas id="game" width="800" height="500" aria-label="Star Dodger game"></canvas>
+    <div class="controls">
+      <button id="start-1p">1 Player Mode</button>
+      <button id="start-2p">2 Player Mode</button>
+    </div>
+    <p class="hint" id="instructions">Select a mode to play!</p>
+  </main>
+  <script>
+    const canvas = document.querySelector("#game");
+    const ctx = canvas.getContext("2d");
+    const p1ScoreText = document.querySelector("#p1-score");
+    const p2ScoreText = document.querySelector("#p2-score");
+    const p2Stat = document.querySelector("#p2-stat");
+    const bestText = document.querySelector("#best");
+    const btn1P = document.querySelector("#start-1p");
+    const btn2P = document.querySelector("#start-2p");
+    const instructions = document.querySelector("#instructions");
+
+    const keys = {};
+    let p1, p2, objects, running, lastTime, spawnTimer, animation, mode;
+    let best = Number(localStorage.getItem("star-dodger-best") || 0);
+    bestText.textContent = best;
+
+    function reset(selectedMode) {
+      mode = selectedMode;
+      p2Stat.style.display = mode === 2 ? "block" : "none";
+
+      if (mode === 1) {
+        p1 = { x: canvas.width / 2 - 18, y: canvas.height - 48, width: 36, height: 24, speed: 380, score: 0, alive: true, color: "#6dcbff", label: "P1" };
+        p2 = null;
+        instructions.textContent = "1P Controls: ← → or A/D to move. Touch/Drag on mobile.";
+      } else {
+        p1 = { x: canvas.width / 3 - 18, y: canvas.height - 48, width: 36, height: 24, speed: 380, score: 0, alive: true, color: "#6dcbff", label: "P1" };
+        p2 = { x: (canvas.width / 3) * 2 - 18, y: canvas.height - 48, width: 36, height: 24, speed: 380, score: 0, alive: true, color: "#ff6dcb", label: "P2" };
+        instructions.textContent = "P1 Controls: A / D  |  P2 Controls: Left / Right Arrows";
+      }
+
+      objects = [];
+      spawnTimer = 0;
+      updateHud();
+    }
+
+    function start(selectedMode) {
+      cancelAnimationFrame(animation);
+      reset(selectedMode);
+      running = true;
+      lastTime = performance.now();
+      animation = requestAnimationFrame(loop);
+    }
+
+    function endGame() {
+      running = false;
+      
+      let topScore = Math.floor(p1.score);
+      if (mode === 2 && Math.floor(p2.score) > topScore) {
+        topScore = Math.floor(p2.score);
+      }
+
+      if (topScore > best) {
+        best = topScore;
+        bestText.textContent = best;
+        localStorage.setItem("star-dodger-best", best);
+      }
+
+      draw();
+      ctx.fillStyle = "#000b";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 38px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("Game Over!", canvas.width / 2, canvas.height / 2 - 20);
+
+      ctx.font = "20px system-ui";
+      if (mode === 1) {
+        ctx.fillText(`Final Score: ${Math.floor(p1.score)}`, canvas.width / 2, canvas.height / 2 + 20);
+      } else {
+        ctx.fillText(`P1 Score: ${Math.floor(p1.score)}  |  P2 Score: ${Math.floor(p2.score)}`, canvas.width / 2, canvas.height / 2 + 20);
+      }
+    }
+
+    function getTotalScore() {
+      let total = 0;
+      if (p1) total += p1.score;
+      if (p2) total += p2.score;
+      return total;
+    }
+
+    function addObject() {
+      const star = Math.random() < .30;
+      objects.push({
+        x: 15 + Math.random() * (canvas.width - 30),
+        y: -20, 
+        size: star ? 11 : 18 + Math.random() * 10,
+        speed: 120 + Math.random() * 100 + getTotalScore() * 0.5,
+        type: star ? "star" : "rock"
+      });
+    }
+
+    function overlaps(a, b) {
+      return b.x + b.size > a.x && b.x - b.size < a.x + a.width &&
+             b.y + b.size > a.y && b.y - b.size < a.y + a.height;
+    }
+
+    function update(delta) {
+      // P1 Controls
+      if (p1 && p1.alive) {
+        if (mode === 1) {
+          if (keys.ArrowLeft || keys.a || keys.A) p1.x -= p1.speed * delta;
+          if (keys.ArrowRight || keys.d || keys.D) p1.x += p1.speed * delta;
+        } else {
+          if (keys.a || keys.A) p1.x -= p1.speed * delta;
+          if (keys.d || keys.D) p1.x += p1.speed * delta;
+        }
+        p1.x = Math.max(0, Math.min(canvas.width - p1.width, p1.x));
+        p1.score += delta * 2;
+      }
+
+      // P2 Controls
+      if (mode === 2 && p2 && p2.alive) {
+        if (keys.ArrowLeft) p2.x -= p2.speed * delta;
+        if (keys.ArrowRight) p2.x += p2.speed * delta;
+        p2.x = Math.max(0, Math.min(canvas.width - p2.width, p2.x));
+        p2.score += delta * 2;
+      }
+
+      spawnTimer += delta;
+      if (spawnTimer > Math.max(.22, .65 - getTotalScore() * .003)) { 
+        spawnTimer = 0; 
+        addObject(); 
+      }
+
+      for (const object of objects) {
+        object.y += object.speed * delta;
+
+        // P1 Collision
+        if (p1 && p1.alive && overlaps(p1, object)) {
+          if (object.type === "star") {
+            p1.score += 15;
+            object.y = canvas.height + 100; // Remove object
+          } else {
+            p1.alive = false;
+            object.y = canvas.height + 100; // Remove rock after impact
+          }
+        }
+
+        // P2 Collision
+        if (mode === 2 && p2 && p2.alive && overlaps(p2, object)) {
+          if (object.type === "star") {
+            p2.score += 15;
+            object.y = canvas.height + 100; // Remove object
+          } else {
+            p2.alive = false;
+            object.y = canvas.height + 100; // Remove rock after impact
+          }
+        }
+      }
+
+      objects = objects.filter(object => object.y < canvas.height + 30);
+      updateHud();
+
+      // Check game over condition:
+      // Game ends if P1 is dead AND (it's 1P mode OR P2 is also dead)
+      const p1Dead = !p1 || !p1.alive;
+      const p2Dead = mode === 1 || (!p2 || !p2.alive);
+
+      if (p1Dead && p2Dead) {
+        endGame();
+      }
+    }
+
+    function updateHud() {
+      p1ScoreText.textContent = Math.floor(p1 ? p1.score : 0);
+      if (mode === 2) {
+        p2ScoreText.textContent = Math.floor(p2 ? p2.score : 0);
+      }
+    }
+
+    function drawShip(player) {
+      if (!player || !player.alive) return;
+      ctx.fillStyle = player.color;
+      ctx.beginPath();
+      ctx.moveTo(player.x + player.width / 2, player.y);
+      ctx.lineTo(player.x + player.width, player.y + player.height);
+      ctx.lineTo(player.x, player.y + player.height);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Starfield background
+      ctx.fillStyle = "#101a38";
+      for (let i = 0; i < 60; i++) {
+        const x = (i * 127) % canvas.width;
+        const y = (i * 73 + (running ? performance.now() / 25 : 0)) % canvas.height;
+        ctx.fillRect(x, y, 2, 2);
+      }
+
+      // Draw objects
+      for (const object of objects) {
+        ctx.fillStyle = object.type === "star" ? "#ffe66d" : "#ec6a77";
+        ctx.beginPath();
+        ctx.arc(object.x, object.y, object.size, 0, Math.PI * 2);
+        ctx.fill();
+        if (object.type === "star") { 
+          ctx.fillStyle = "#fff7b0"; 
+          ctx.fillRect(object.x - 2, object.y - 2, 4, 4); 
+        }
+      }
+
+      // Draw Players
+      drawShip(p1);
+      if (mode === 2) drawShip(p2);
+    }
+
+    function loop(time) {
+      const delta = Math.min((time - lastTime) / 1000, .05);
+      lastTime = time;
+      if (!running) return;
+      update(delta);
+      draw();
+      if (running) animation = requestAnimationFrame(loop);
+    }
+
+    window.addEventListener("keydown", event => { keys[event.key] = true; });
+    window.addEventListener("keyup", event => { keys[event.key] = false; });
+
+    canvas.addEventListener("pointermove", event => {
+      if (!running || mode !== 1 || !p1 || !p1.alive) return;
+      const rect = canvas.getBoundingClientRect();
+      p1.x = (event.clientX - rect.left) * canvas.width / rect.width - p1.width / 2;
+    });
+
+    btn1P.addEventListener("click", () => start(1));
+    btn2P.addEventListener("click", () => start(2));
+
+    reset(1);
+    draw();
+  </script>
+</body>
+</html>
